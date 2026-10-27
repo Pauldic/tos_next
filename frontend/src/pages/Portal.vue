@@ -3,7 +3,11 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { Badge, Button, ErrorMessage, useColorScheme } from 'frappe-ui'
 import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
+import AppointmentPass from '../components/AppointmentPass.vue'
 import { portalAct, portalApi } from '../api'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const { resolvedColorScheme, toggleColorScheme } = useColorScheme()
 
@@ -25,6 +29,8 @@ const MOVES = [
 const form = reactive({ move: 'Export Drop', date: iso(new Date()), slot: '', carrier: '', truck: '', driver: '', container: '', booking_ref: '' })
 const booking = ref(false)
 const done = ref<any>(null)
+const pass = ref<any>(null)
+const openPass = (name: string) => (pass.value = appts.value.find((a) => a.name === name) || null)
 
 async function loadCtx() {
   try {
@@ -84,7 +90,10 @@ const past = computed(() => appts.value.filter((a) => ['Cancelled', 'Completed',
         <h1 class="text-lg-semibold text-ink-gray-9">Book a terminal slot</h1>
         <p class="truncate text-sm text-ink-gray-5">{{ ctx?.terminal_name || 'Carrier portal' }}</p>
       </div>
-      <Button :icon="resolvedColorScheme === 'dark' ? 'lucide-sun' : 'lucide-moon'" aria-label="Switch light and dark mode" @click="toggleColorScheme" />
+      <div class="flex items-center gap-2">
+        <Button icon-left="lucide-truck" label="My fleet" @click="router.push('/portal/fleet')" />
+        <Button :icon="resolvedColorScheme === 'dark' ? 'lucide-sun' : 'lucide-moon'" aria-label="Switch light and dark mode" @click="toggleColorScheme" />
+      </div>
     </header>
 
     <ErrorMessage v-if="error" class="mb-4 whitespace-pre-line rounded-5 bg-surface-red-1 p-3" :message="error" />
@@ -94,8 +103,8 @@ const past = computed(() => appts.value.filter((a) => ['Cancelled', 'Completed',
 
       <section v-if="done" class="mb-5 rounded-6 border border-outline-green-2 bg-surface-green-1 p-4">
         <p class="text-base-medium text-ink-green-3">Booked: {{ done.name }}</p>
-        <p class="mt-1 text-sm text-ink-green-3">Show this check-in code at the gate: <b class="font-mono tracking-wider">{{ done.qr_token }}</b></p>
-        <button class="mt-2 text-sm underline" @click="done = null">Dismiss</button>
+        <p class="mt-1 text-sm text-ink-green-3">Your gate pass is ready. The driver shows it at the gate.</p>
+        <div class="mt-3 flex gap-2"><Button variant="solid" icon-left="lucide-qr-code" label="Show pass" @click="openPass(done.name)" /><Button variant="ghost" label="Dismiss" @click="done = null" /></div>
       </section>
 
       <section class="mb-8 space-y-5 rounded-6 border border-outline-gray-1 bg-surface-white p-4 shadow-sm">
@@ -153,8 +162,11 @@ const past = computed(() => appts.value.filter((a) => ['Cancelled', 'Completed',
               <Badge :theme="theme(a.status)" :label="a.status" />
             </div>
             <div class="mt-2 flex items-center justify-between text-sm">
-              <span class="text-ink-gray-5">{{ a.name }} · code <b class="font-mono text-ink-gray-8">{{ a.qr_token }}</b></span>
-              <Button v-if="['Booked', 'Late'].includes(a.status)" variant="ghost" label="Cancel" @click="Object.assign(cancel, { open: true, name: a.name, reason: '', error: '' })" />
+              <span class="text-ink-gray-5">{{ a.name }}</span>
+              <span class="flex gap-1">
+                <Button v-if="['Booked', 'Late', 'Arrived'].includes(a.status)" variant="subtle" icon-left="lucide-qr-code" label="Pass" @click="openPass(a.name)" />
+                <Button v-if="['Booked', 'Late'].includes(a.status)" variant="ghost" label="Cancel" @click="Object.assign(cancel, { open: true, name: a.name, reason: '', error: '' })" />
+              </span>
             </div>
           </li>
           <li v-if="!upcoming.length" class="rounded-6 border border-dashed border-outline-gray-2 p-6 text-center text-sm text-ink-gray-5">No upcoming appointments.</li>
@@ -168,6 +180,8 @@ const past = computed(() => appts.value.filter((a) => ['Cancelled', 'Completed',
     </template>
     <p v-else-if="!error" class="py-20 text-center text-sm text-ink-gray-5">Loading…</p>
   </div>
+
+  <AppointmentPass v-if="pass" :appt="pass" :ctx="ctx" @close="pass = null" />
 
   <Modal :open="cancel.open" title="Cancel appointment" confirm-label="Cancel appointment" :loading="cancel.loading" :error="cancel.error" @close="cancel.open = false" @confirm="submitCancel">
     <Field :label="'Why are you cancelling ' + cancel.name + '?'"><textarea v-model="cancel.reason" rows="3" class="tos-input" /></Field>

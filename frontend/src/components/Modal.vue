@@ -15,7 +15,7 @@ defineEmits<{ close: []; confirm: [] }>()
         <div class="space-y-3"><slot /></div>
         <ErrorMessage v-if="error" class="mt-3 whitespace-pre-line" :message="error" />
         <div class="mt-5 flex justify-end gap-2">
-          <Button label="Cancel" @click="$emit('close')" />
+          <Button :label="hideConfirm ? 'Close' : 'Cancel'" @click="$emit('close')" />
           <Button v-if="!hideConfirm" variant="solid" :label="confirmLabel || 'Save'" :loading="loading" @click="$emit('confirm')" />
         </div>
       </div>

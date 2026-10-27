@@ -5,6 +5,7 @@ import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
 import ContainerPick from '../components/ContainerPick.vue'
 import PartyPicker from '../components/PartyPicker.vue'
+import ScanPass from '../components/ScanPass.vue'
 import { act, gateApi, tos } from '../api'
 import { useTerminal } from '../composables/useTerminal'
 import { usePolling } from '../composables/usePolling'
@@ -14,6 +15,7 @@ const lanes = ref<any[]>([])
 const queue = ref<any[]>([])
 const overrides = ref<any[]>([])
 const error = ref('')
+const scanning = ref(false)
 
 async function refresh() {
   try {
@@ -97,7 +99,10 @@ const time = (t?: string) => (t || '').slice(0, 5)
 <template>
   <PageHeader>
     <PageHeaderTitle title="Gate" />
-    <span class="text-sm text-ink-gray-5">{{ current?.terminal_name }} · refreshes every 5 seconds</span>
+    <div class="flex items-center gap-3">
+      <span class="hidden text-sm text-ink-gray-5 sm:inline">{{ current?.terminal_name }} · refreshes every 5 seconds</span>
+      <Button variant="solid" icon-left="lucide-scan-line" label="Scan pass" @click="scanning = true" />
+    </div>
   </PageHeader>
 
   <div class="mx-auto max-w-[1300px] space-y-6 px-4 pb-10 pt-6 sm:px-6">
@@ -168,6 +173,8 @@ const time = (t?: string) => (t || '').slice(0, 5)
       </aside>
     </div>
   </div>
+
+  <ScanPass :open="scanning" :terminal="selected" :lanes="lanes" :overrides="overrides" @close="scanning = false" @started="refresh" />
 
   <Modal :open="prompt.open" :title="prompt.title" :error="prompt.error" confirm-label="Confirm" :loading="!!busy" @close="prompt.open = false" @confirm="submitPrompt">
     <Field :label="prompt.label"><textarea v-if="!prompt.second" v-model="prompt.value" rows="3" class="tos-input" /><input v-else v-model="prompt.value" class="tos-input" /></Field>

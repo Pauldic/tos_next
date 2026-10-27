@@ -121,23 +121,23 @@ const dwell = (c: any) => (c.dwell_days == null ? '' : c.dwell_days + ' d on ter
     <div ref="host" class="absolute inset-0" />
 
     <!-- search + filters -->
-    <div class="absolute left-4 top-4 w-72 space-y-2">
+    <div class="absolute left-4 top-4 w-52 space-y-2">
       <div class="relative">
         <input v-model="q" class="tos-input shadow-sm" placeholder="Find a container…" aria-label="Find a container" @input="onSearch" />
-        <ul v-if="results.length" class="absolute z-10 mt-1 w-full overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-white shadow-lg">
+        <ul v-if="results.length" class="absolute z-10 w-full overflow-hidden rounded-5 border border-outline-gray-2 bg-surface-white shadow-lg">
           <li v-for="r in results" :key="r.name"><button class="flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-surface-gray-2" @click="goTo(r.name)"><span class="text-ink-gray-8">{{ r.name }}</span><span class="text-ink-gray-5">{{ r.yard_stack || r.status }}</span></button></li>
         </ul>
       </div>
-      <div class="rounded-6 border border-outline-gray-1 bg-surface-white/95 p-3 shadow-sm backdrop-blur">
+      <div class="rounded-6 border border-outline-gray-1 bg-surface-white/95 py-3 px-2 shadow-sm backdrop-blur">
         <p class="mb-2 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Shipping line</p>
-        <div class="flex flex-wrap gap-1.5">
-          <button v-for="l in lines" :key="l.name" :aria-pressed="filter.line === l.name" :class="['flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs', filter.line === l.name ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="toggleLine(l.name)">
+        <div class="flex flex-wrap gap-1">
+          <button v-for="l in lines" :key="l.name" :aria-pressed="filter.line === l.name" :class="['flex items-center gap-1 rounded-full border px-1 py-0 text-xs', filter.line === l.name ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="toggleLine(l.name)">
             <span class="size-2.5 rounded-full" :style="{ background: lineColour(l.name) }" />{{ l.line_name || l.name }}
           </button>
         </div>
-        <div class="mt-3 flex flex-wrap gap-1.5">
-          <button :aria-pressed="!!filter.holdsOnly" :class="['rounded-full border px-2.5 py-1 text-xs', filter.holdsOnly ? 'border-outline-red-2 bg-surface-red-1 text-ink-red-3' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.holdsOnly = !filter.holdsOnly">On hold ({{ holdCount }})</button>
-          <button v-for="c in ['Full', 'Empty']" :key="c" :aria-pressed="filter.cargo === c" :class="['rounded-full border px-2.5 py-1 text-xs', filter.cargo === c ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.cargo = filter.cargo === c ? null : (c as any)">{{ c }}</button>
+        <div class="mt-3 flex flex-wrap gap-1">
+          <button :aria-pressed="!!filter.holdsOnly" :class="['rounded-full border px-1 py-1 text-xs', filter.holdsOnly ? 'border-outline-red-2 bg-surface-red-1 text-ink-red-3' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.holdsOnly = !filter.holdsOnly">On hold ({{ holdCount }})</button>
+          <button v-for="c in ['Full', 'Empty']" :key="c" :aria-pressed="filter.cargo === c" :class="['rounded-full border px-1.5 py-1 text-xs', filter.cargo === c ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.cargo = filter.cargo === c ? null : (c as any)">{{ c }}</button>
         </div>
       </div>
     </div>

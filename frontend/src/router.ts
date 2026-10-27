@@ -10,6 +10,7 @@ export const router = createRouter({
     { path: '/appointments', name: 'appointments', component: () => import('./pages/Appointments.vue'), meta: { title: 'Appointments' } },
     { path: '/ops', name: 'ops', component: () => import('./pages/Ops.vue'), meta: { title: 'My moves', bare: true } },
     { path: '/portal', name: 'portal', component: () => import('./pages/Portal.vue'), meta: { title: 'Carrier portal', bare: true } },
+    { path: '/portal/fleet', name: 'portal-fleet', component: () => import('./pages/PortalFleet.vue'), meta: { title: 'My fleet', bare: true } },
     { path: '/:path(.*)*', component: () => import('./pages/NotFound.vue') },
   ],
 })
