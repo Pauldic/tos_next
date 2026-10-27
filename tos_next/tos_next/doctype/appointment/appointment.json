@@ -1,0 +1,275 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "terminal",
+  "slot",
+  "slot_date",
+  "start_time",
+  "end_time",
+  "cb1",
+  "move_type",
+  "direction",
+  "status",
+  "sb_who",
+  "carrier",
+  "truck",
+  "cb2",
+  "driver",
+  "sb_what",
+  "container",
+  "booking_ref",
+  "cb3",
+  "override",
+  "qr_token",
+  "sb_times",
+  "arrived_at",
+  "completed_at",
+  "cancel_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "slot",
+   "fieldtype": "Link",
+   "label": "Slot",
+   "options": "Slot Capacity",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "slot_date",
+   "fieldtype": "Date",
+   "label": "Date",
+   "fetch_from": "slot.slot_date",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "start_time",
+   "fieldtype": "Time",
+   "label": "From",
+   "fetch_from": "slot.start_time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "end_time",
+   "fieldtype": "Time",
+   "label": "To",
+   "fetch_from": "slot.end_time",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "move_type",
+   "fieldtype": "Select",
+   "label": "Move",
+   "options": "Export Drop\nEmpty Return\nImport Pickup\nEmpty Pickup",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Direction",
+   "options": "In\nOut",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Booked\nArrived\nIn Progress\nCompleted\nLate\nNo-show\nCancelled",
+   "default": "Booked",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_who",
+   "fieldtype": "Section Break",
+   "label": "Who"
+  },
+  {
+   "fieldname": "carrier",
+   "fieldtype": "Link",
+   "label": "Carrier",
+   "options": "Carrier",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "truck",
+   "fieldtype": "Link",
+   "label": "Truck",
+   "options": "Truck",
+   "reqd": 1
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "label": "Driver",
+   "options": "Driver",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sb_what",
+   "fieldtype": "Section Break",
+   "label": "What"
+  },
+  {
+   "fieldname": "container",
+   "fieldtype": "Link",
+   "label": "Container",
+   "options": "Container",
+   "depends_on": "eval:doc.move_type!='Export Drop' && doc.move_type!='Empty Return'",
+   "mandatory_depends_on": "eval:doc.move_type=='Import Pickup'"
+  },
+  {
+   "fieldname": "booking_ref",
+   "fieldtype": "Data",
+   "label": "Booking Reference",
+   "depends_on": "eval:doc.move_type=='Export Drop'",
+   "mandatory_depends_on": "eval:doc.move_type=='Export Drop'"
+  },
+  {
+   "fieldname": "cb3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "override",
+   "fieldtype": "Link",
+   "label": "Override",
+   "options": "Appointment Override",
+   "no_copy": 1,
+   "description": "Needed only to book into a full slot or outside its time window"
+  },
+  {
+   "fieldname": "qr_token",
+   "fieldtype": "Data",
+   "label": "Gate Token",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1,
+   "description": "Shown as a QR code for the lane to scan"
+  },
+  {
+   "fieldname": "sb_times",
+   "fieldtype": "Section Break",
+   "label": "Times"
+  },
+  {
+   "fieldname": "arrived_at",
+   "fieldtype": "Datetime",
+   "label": "Arrived At",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "cancel_reason",
+   "fieldtype": "Small Text",
+   "label": "Cancel Reason",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Appointment",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Carrier Portal User",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "AP-.YYYY.-.#####",
+ "naming_rule": "Expression (old style)",
+ "title_field": "name",
+ "search_fields": "carrier,truck,container"
+}

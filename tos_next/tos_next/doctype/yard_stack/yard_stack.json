@@ -1,0 +1,171 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "yard_block",
+  "terminal",
+  "bay",
+  "row_no",
+  "cb1",
+  "max_tier",
+  "tier_count",
+  "is_blocked",
+  "sb_pair",
+  "is_forty_anchor",
+  "pair_stack"
+ ],
+ "fields": [
+  {
+   "fieldname": "yard_block",
+   "fieldtype": "Link",
+   "label": "Yard Block",
+   "options": "Yard Block",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "fetch_from": "yard_block.terminal",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "bay",
+   "fieldtype": "Int",
+   "label": "Bay",
+   "reqd": 1,
+   "in_list_view": 1,
+   "set_only_once": 1,
+   "description": "20 ft slot number. Odd bays anchor 40 ft containers."
+  },
+  {
+   "fieldname": "row_no",
+   "fieldtype": "Int",
+   "label": "Row",
+   "reqd": 1,
+   "in_list_view": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_tier",
+   "fieldtype": "Int",
+   "label": "Maximum Tier Height",
+   "read_only": 1,
+   "fetch_from": "yard_block.max_tier",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "tier_count",
+   "fieldtype": "Int",
+   "label": "Tiers in Use",
+   "read_only": 1,
+   "default": "0",
+   "no_copy": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "is_blocked",
+   "fieldtype": "Check",
+   "label": "Blocked",
+   "description": "Closed for maintenance or damage. No moves in or out."
+  },
+  {
+   "fieldname": "sb_pair",
+   "fieldtype": "Section Break",
+   "label": "20 ft and 40 ft"
+  },
+  {
+   "fieldname": "is_forty_anchor",
+   "fieldtype": "Check",
+   "label": "40 ft Anchor Slot",
+   "read_only": 1,
+   "description": "Odd bays. A 40 ft container is recorded here and also occupies the paired slot."
+  },
+  {
+   "fieldname": "pair_stack",
+   "fieldtype": "Link",
+   "label": "Paired Stack",
+   "options": "Yard Stack",
+   "read_only": 1,
+   "description": "The next bay in the same row, set on anchor slots"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Yard Stack",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "naming_rule": "By script",
+ "title_field": "name"
+}

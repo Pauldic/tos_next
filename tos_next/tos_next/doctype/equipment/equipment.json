@@ -1,0 +1,140 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "equipment_code",
+  "terminal",
+  "equipment_type",
+  "status",
+  "cb1",
+  "current_operator",
+  "capacity_tonnes",
+  "max_lift_tier",
+  "handles_forty"
+ ],
+ "fields": [
+  {
+   "fieldname": "equipment_code",
+   "fieldtype": "Data",
+   "label": "Equipment Code",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "equipment_type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "Quay Crane\nRTG\nReach Stacker\nTerminal Tractor\nEmpty Handler",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Available\nWorking\nMaintenance\nOffline",
+   "default": "Available",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "current_operator",
+   "fieldtype": "Link",
+   "label": "Current Operator",
+   "options": "User"
+  },
+  {
+   "fieldname": "capacity_tonnes",
+   "fieldtype": "Float",
+   "label": "Capacity (tonnes)"
+  },
+  {
+   "fieldname": "max_lift_tier",
+   "fieldtype": "Int",
+   "label": "Highest Tier It Can Reach",
+   "default": "4",
+   "description": "A move to a taller stack than this cannot be assigned to it"
+  },
+  {
+   "fieldname": "handles_forty",
+   "fieldtype": "Check",
+   "label": "Handles 40 ft and 45 ft",
+   "default": "1"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Equipment",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "write": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "field:equipment_code",
+ "naming_rule": "By fieldname",
+ "title_field": "equipment_code"
+}

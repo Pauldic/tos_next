@@ -1,0 +1,363 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "lane",
+  "terminal",
+  "direction",
+  "status",
+  "hold_reason",
+  "cb1",
+  "appointment",
+  "override",
+  "sb_who",
+  "carrier",
+  "truck",
+  "cb2",
+  "driver",
+  "move_type",
+  "sb_ctr",
+  "container",
+  "container_no",
+  "container_type",
+  "cb3",
+  "shipping_line",
+  "booking_ref",
+  "gross_weight_kg",
+  "sb_ocr",
+  "ocr_container_no",
+  "ocr_confidence",
+  "seal_no",
+  "cb4",
+  "seal_intact",
+  "damage_found",
+  "damage_notes",
+  "sb_flow",
+  "current_step",
+  "checks",
+  "sb_times",
+  "entered_at",
+  "cleared_at",
+  "cb5",
+  "exited_at",
+  "turn_minutes"
+ ],
+ "fields": [
+  {
+   "fieldname": "lane",
+   "fieldtype": "Link",
+   "label": "Lane",
+   "options": "Gate Lane",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "fetch_from": "lane.terminal",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Direction",
+   "options": "In\nOut",
+   "fetch_from": "lane.direction",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Processing\nOn Hold\nCleared\nCompleted\nRejected",
+   "default": "Processing",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "hold_reason",
+   "fieldtype": "Small Text",
+   "label": "Hold Reason",
+   "read_only": 1,
+   "no_copy": 1,
+   "depends_on": "eval:doc.status=='On Hold'"
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "appointment",
+   "fieldtype": "Link",
+   "label": "Appointment",
+   "options": "Appointment",
+   "in_standard_filter": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "override",
+   "fieldtype": "Link",
+   "label": "Appointment Override",
+   "options": "Appointment Override",
+   "set_only_once": 1,
+   "description": "Needed when there is no appointment, or the truck, driver, carrier or time does not match it"
+  },
+  {
+   "fieldname": "sb_who",
+   "fieldtype": "Section Break",
+   "label": "Truck"
+  },
+  {
+   "fieldname": "carrier",
+   "fieldtype": "Link",
+   "label": "Carrier",
+   "options": "Carrier",
+   "reqd": 1
+  },
+  {
+   "fieldname": "truck",
+   "fieldtype": "Link",
+   "label": "Truck",
+   "options": "Truck",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "driver",
+   "fieldtype": "Link",
+   "label": "Driver",
+   "options": "Driver",
+   "reqd": 1
+  },
+  {
+   "fieldname": "move_type",
+   "fieldtype": "Select",
+   "label": "Move",
+   "options": "Export Drop\nEmpty Return\nImport Pickup\nEmpty Pickup",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sb_ctr",
+   "fieldtype": "Section Break",
+   "label": "Container"
+  },
+  {
+   "fieldname": "container",
+   "fieldtype": "Link",
+   "label": "Container",
+   "options": "Container"
+  },
+  {
+   "fieldname": "container_no",
+   "fieldtype": "Data",
+   "label": "Container Number",
+   "description": "For a container that is not yet in the system. Filled from OCR."
+  },
+  {
+   "fieldname": "container_type",
+   "fieldtype": "Link",
+   "label": "Container Type",
+   "options": "Container Type",
+   "description": "Required for a new container"
+  },
+  {
+   "fieldname": "cb3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shipping_line",
+   "fieldtype": "Link",
+   "label": "Shipping Line",
+   "options": "Shipping Line"
+  },
+  {
+   "fieldname": "booking_ref",
+   "fieldtype": "Data",
+   "label": "Booking Reference"
+  },
+  {
+   "fieldname": "gross_weight_kg",
+   "fieldtype": "Float",
+   "label": "Gross Weight (kg)"
+  },
+  {
+   "fieldname": "sb_ocr",
+   "fieldtype": "Section Break",
+   "label": "Portal Reads and Inspection"
+  },
+  {
+   "fieldname": "ocr_container_no",
+   "fieldtype": "Data",
+   "label": "OCR Container Number",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "ocr_confidence",
+   "fieldtype": "Percent",
+   "label": "OCR Confidence",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "seal_no",
+   "fieldtype": "Data",
+   "label": "Seal Number"
+  },
+  {
+   "fieldname": "cb4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "seal_intact",
+   "fieldtype": "Check",
+   "label": "Seal Intact",
+   "default": "1"
+  },
+  {
+   "fieldname": "damage_found",
+   "fieldtype": "Check",
+   "label": "Damage Found"
+  },
+  {
+   "fieldname": "damage_notes",
+   "fieldtype": "Small Text",
+   "label": "Damage Notes",
+   "depends_on": "damage_found",
+   "mandatory_depends_on": "damage_found"
+  },
+  {
+   "fieldname": "sb_flow",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "fieldname": "current_step",
+   "fieldtype": "Int",
+   "label": "Current Step",
+   "read_only": 1,
+   "default": "0",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "checks",
+   "fieldtype": "Table",
+   "label": "Checks",
+   "options": "Gate Check Step",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_times",
+   "fieldtype": "Section Break",
+   "label": "Times"
+  },
+  {
+   "fieldname": "entered_at",
+   "fieldtype": "Datetime",
+   "label": "Entered",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "cleared_at",
+   "fieldtype": "Datetime",
+   "label": "Cleared",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "cb5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "exited_at",
+   "fieldtype": "Datetime",
+   "label": "Exited",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "turn_minutes",
+   "fieldtype": "Int",
+   "label": "Turn Time (min)",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Gate Transaction",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "print": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "GT-.YYYY.-.#######",
+ "naming_rule": "Expression (old style)",
+ "title_field": "truck",
+ "search_fields": "truck,container,container_no"
+}

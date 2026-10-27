@@ -1,0 +1,184 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "container",
+  "terminal",
+  "hold_type",
+  "status",
+  "cb1",
+  "reason",
+  "reference",
+  "sb_audit",
+  "placed_by",
+  "placed_on",
+  "cb2",
+  "released_by",
+  "released_on",
+  "release_note"
+ ],
+ "fields": [
+  {
+   "fieldname": "container",
+   "fieldtype": "Link",
+   "label": "Container",
+   "options": "Container",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "fetch_from": "container.terminal",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hold_type",
+   "fieldtype": "Select",
+   "label": "Hold Type",
+   "options": "Customs\nShipping Line\nTerminal\nDamage\nDocuments",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Active\nReleased",
+   "default": "Active",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reason",
+   "fieldtype": "Small Text",
+   "label": "Reason",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "External Reference",
+   "description": "Customs or line reference number"
+  },
+  {
+   "fieldname": "sb_audit",
+   "fieldtype": "Section Break",
+   "label": "Audit"
+  },
+  {
+   "fieldname": "placed_by",
+   "fieldtype": "Link",
+   "label": "Placed By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "placed_on",
+   "fieldtype": "Datetime",
+   "label": "Placed On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "released_by",
+   "fieldtype": "Link",
+   "label": "Released By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "released_on",
+   "fieldtype": "Datetime",
+   "label": "Released On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "release_note",
+   "fieldtype": "Small Text",
+   "label": "Release Note",
+   "depends_on": "eval:doc.status=='Released'",
+   "mandatory_depends_on": "eval:doc.status=='Released'"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Container Hold",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "HLD-.#####",
+ "naming_rule": "Expression (old style)",
+ "title_field": "container"
+}

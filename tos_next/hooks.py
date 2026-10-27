@@ -1,14 +1,14 @@
 app_name = "tos_next"
 app_title = "TOS Next"
 app_publisher = "Paul Okeke"
-app_description = "TOS Next"
+app_description = "Terminal Operating System for container terminals"
 app_email = "pauldiconline@gmail.com"
 app_license = "mit"
 
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["frappe"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
@@ -86,7 +86,7 @@ app_license = "mit"
 # ------------
 
 # before_install = "tos_next.install.before_install"
-# after_install = "tos_next.install.after_install"
+after_install = "tos_next.setup.install.after_install"
 
 # Uninstallation
 # ------------
@@ -172,6 +172,19 @@ app_license = "mit"
 # 		"tos_next.tasks.monthly"
 # 	],
 # }
+
+scheduler_events = {
+    "cron": {
+        "*/5 * * * *": [
+            "tos_next.tos_next.doctype.appointment.appointment.mark_late_and_no_show",
+            "tos_next.tos_next.doctype.appointment_override.appointment_override.expire_overrides",
+        ]
+    },
+    "daily": [
+        "tos_next.tos_next.doctype.slot_template.slot_template.generate_slots",
+    ],
+}
+
 
 # Testing
 # -------
@@ -262,3 +275,7 @@ app_license = "mit"
 # List of apps whose translatable strings should be excluded from this app's translations.
 # ignore_translatable_strings_from = []
 
+# Load the frontend on every path under /tos
+website_route_rules = [
+    {"from_route": "/tos/<path:app_path>", "to_route": "tos"},
+]

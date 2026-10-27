@@ -1,0 +1,163 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "iso_type",
+  "description",
+  "is_active",
+  "cb1",
+  "length_ft",
+  "height",
+  "is_reefer",
+  "sb_dims",
+  "tare_kg",
+  "max_gross_kg",
+  "cb2",
+  "slot_span",
+  "teu"
+ ],
+ "fields": [
+  {
+   "fieldname": "iso_type",
+   "fieldtype": "Data",
+   "label": "ISO Type Code",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "For example 22G1, 45G1, 45R1"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "label": "Description",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1"
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "length_ft",
+   "fieldtype": "Select",
+   "label": "Length (ft)",
+   "options": "20\n40\n45",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "height",
+   "fieldtype": "Select",
+   "label": "Height",
+   "options": "Standard\nHigh Cube",
+   "default": "Standard"
+  },
+  {
+   "fieldname": "is_reefer",
+   "fieldtype": "Check",
+   "label": "Reefer"
+  },
+  {
+   "fieldname": "sb_dims",
+   "fieldtype": "Section Break",
+   "label": "Weights and Footprint"
+  },
+  {
+   "fieldname": "tare_kg",
+   "fieldtype": "Float",
+   "label": "Tare Weight (kg)"
+  },
+  {
+   "fieldname": "max_gross_kg",
+   "fieldtype": "Float",
+   "label": "Maximum Gross Weight (kg)"
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "slot_span",
+   "fieldtype": "Int",
+   "label": "Yard Slots Used",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "1 for 20 ft. 2 for 40 ft and 45 ft, which sit across two adjacent bays."
+  },
+  {
+   "fieldname": "teu",
+   "fieldtype": "Float",
+   "label": "TEU",
+   "read_only": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Container Type",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "field:iso_type",
+ "naming_rule": "By fieldname",
+ "title_field": "iso_type"
+}

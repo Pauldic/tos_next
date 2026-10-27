@@ -1,0 +1,164 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "terminal_code",
+  "terminal_name",
+  "is_active",
+  "cb1",
+  "timezone",
+  "opening_time",
+  "closing_time",
+  "sb_rules",
+  "max_tier",
+  "require_appointment",
+  "cb2",
+  "override_needs_second_approver",
+  "late_grace_minutes"
+ ],
+ "fields": [
+  {
+   "fieldname": "terminal_code",
+   "fieldtype": "Data",
+   "label": "Terminal Code",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "terminal_name",
+   "fieldtype": "Data",
+   "label": "Terminal Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "timezone",
+   "fieldtype": "Data",
+   "label": "Time Zone",
+   "description": "IANA name, for example Africa/Lagos"
+  },
+  {
+   "fieldname": "opening_time",
+   "fieldtype": "Time",
+   "label": "Opening Time"
+  },
+  {
+   "fieldname": "closing_time",
+   "fieldtype": "Time",
+   "label": "Closing Time"
+  },
+  {
+   "fieldname": "sb_rules",
+   "fieldtype": "Section Break",
+   "label": "Rules"
+  },
+  {
+   "fieldname": "max_tier",
+   "fieldtype": "Int",
+   "label": "Maximum Tier Height",
+   "default": "5",
+   "description": "Highest stack allowed anywhere in this terminal"
+  },
+  {
+   "fieldname": "require_appointment",
+   "fieldtype": "Check",
+   "label": "Require Appointment",
+   "default": "1",
+   "description": "Trucks without an appointment need an approved Appointment Override"
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "override_needs_second_approver",
+   "fieldtype": "Check",
+   "label": "Override Needs a Different Approver",
+   "default": "1",
+   "description": "The person who requests an override cannot approve it"
+  },
+  {
+   "fieldname": "late_grace_minutes",
+   "fieldtype": "Int",
+   "label": "Late After (minutes)",
+   "default": "15"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Terminal",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "field:terminal_code",
+ "naming_rule": "By fieldname",
+ "title_field": "terminal_name",
+ "search_fields": "terminal_name"
+}

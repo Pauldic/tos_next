@@ -1,0 +1,280 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "container_no",
+  "terminal",
+  "shipping_line",
+  "container_type",
+  "cb1",
+  "cargo_status",
+  "status",
+  "is_on_hold",
+  "sb_size",
+  "length_ft",
+  "slot_span",
+  "cb2",
+  "gross_weight_kg",
+  "vgm_kg",
+  "seal_no",
+  "sb_pos",
+  "yard_stack",
+  "partner_stack",
+  "cb3",
+  "tier",
+  "sb_dates",
+  "arrived_on",
+  "free_days_until",
+  "cb4",
+  "booking_ref",
+  "bill_of_lading"
+ ],
+ "fields": [
+  {
+   "fieldname": "container_no",
+   "fieldtype": "Data",
+   "label": "Container Number",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "set_only_once": 1,
+   "description": "ISO 6346, for example NWDU4829107"
+  },
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "shipping_line",
+   "fieldtype": "Link",
+   "label": "Shipping Line",
+   "options": "Shipping Line",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "container_type",
+   "fieldtype": "Link",
+   "label": "Container Type",
+   "options": "Container Type",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cargo_status",
+   "fieldtype": "Select",
+   "label": "Cargo",
+   "options": "Import\nExport\nEmpty\nReefer\nTransshipment",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Expected\nOn Terminal\nGated Out\nLoaded on Vessel",
+   "default": "Expected",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "is_on_hold",
+   "fieldtype": "Check",
+   "label": "On Hold",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_size",
+   "fieldtype": "Section Break",
+   "label": "Size"
+  },
+  {
+   "fieldname": "length_ft",
+   "fieldtype": "Data",
+   "label": "Length (ft)",
+   "fetch_from": "container_type.length_ft",
+   "read_only": 1
+  },
+  {
+   "fieldname": "slot_span",
+   "fieldtype": "Int",
+   "label": "Yard Slots Used",
+   "fetch_from": "container_type.slot_span",
+   "read_only": 1,
+   "description": "1 for 20 ft, 2 for 40 ft and 45 ft"
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gross_weight_kg",
+   "fieldtype": "Float",
+   "label": "Gross Weight (kg)"
+  },
+  {
+   "fieldname": "vgm_kg",
+   "fieldtype": "Float",
+   "label": "Verified Gross Mass (kg)"
+  },
+  {
+   "fieldname": "seal_no",
+   "fieldtype": "Data",
+   "label": "Seal Number"
+  },
+  {
+   "fieldname": "sb_pos",
+   "fieldtype": "Section Break",
+   "label": "Yard Position",
+   "description": "Changed only by yard moves, never edited by hand"
+  },
+  {
+   "fieldname": "yard_stack",
+   "fieldtype": "Link",
+   "label": "Stack",
+   "options": "Yard Stack",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "partner_stack",
+   "fieldtype": "Link",
+   "label": "Second Stack (40 ft)",
+   "options": "Yard Stack",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "cb3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tier",
+   "fieldtype": "Int",
+   "label": "Tier",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_dates",
+   "fieldtype": "Section Break",
+   "label": "Dwell and Documents"
+  },
+  {
+   "fieldname": "arrived_on",
+   "fieldtype": "Datetime",
+   "label": "Arrived On",
+   "no_copy": 1
+  },
+  {
+   "fieldname": "free_days_until",
+   "fieldtype": "Date",
+   "label": "Free Days Until"
+  },
+  {
+   "fieldname": "cb4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "booking_ref",
+   "fieldtype": "Data",
+   "label": "Booking Reference",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "bill_of_lading",
+   "fieldtype": "Data",
+   "label": "Bill of Lading"
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Container",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "naming_rule": "By script",
+ "title_field": "container_no",
+ "search_fields": "shipping_line,cargo_status",
+ "show_title_field_in_link": 1
+}

@@ -1,0 +1,255 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "terminal",
+  "container",
+  "length_ft",
+  "move_type",
+  "cb1",
+  "status",
+  "priority",
+  "sb_route",
+  "from_stack",
+  "from_tier",
+  "cb2",
+  "to_stack",
+  "to_tier",
+  "sb_work",
+  "equipment",
+  "assigned_to",
+  "requested_by",
+  "cb3",
+  "started_at",
+  "completed_at",
+  "sb_notes",
+  "notes",
+  "cancel_reason"
+ ],
+ "fields": [
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "reqd": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "container",
+   "fieldtype": "Link",
+   "label": "Container",
+   "options": "Container",
+   "reqd": 1,
+   "in_list_view": 1,
+   "set_only_once": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "length_ft",
+   "fieldtype": "Data",
+   "label": "Length (ft)",
+   "fetch_from": "container.length_ft",
+   "read_only": 1
+  },
+  {
+   "fieldname": "move_type",
+   "fieldtype": "Select",
+   "label": "Move Type",
+   "options": "Yard Shift\nReshuffle\nFrom Gate In\nTo Gate Out\nTo Vessel\nFrom Vessel",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Queued\nAssigned\nIn Progress\nCompleted\nCancelled\nFailed",
+   "default": "Queued",
+   "reqd": 1,
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "priority",
+   "fieldtype": "Select",
+   "label": "Priority",
+   "options": "Normal\nHigh\nUrgent",
+   "default": "Normal",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sb_route",
+   "fieldtype": "Section Break",
+   "label": "Route"
+  },
+  {
+   "fieldname": "from_stack",
+   "fieldtype": "Link",
+   "label": "From Stack",
+   "options": "Yard Stack",
+   "read_only": 1
+  },
+  {
+   "fieldname": "from_tier",
+   "fieldtype": "Int",
+   "label": "From Tier",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "to_stack",
+   "fieldtype": "Link",
+   "label": "To Stack",
+   "options": "Yard Stack",
+   "depends_on": "eval:['Yard Shift','Reshuffle','From Gate In','From Vessel'].includes(doc.move_type)",
+   "mandatory_depends_on": "eval:['Yard Shift','Reshuffle','From Gate In','From Vessel'].includes(doc.move_type)",
+   "description": "For 40 ft containers choose an odd (anchor) bay"
+  },
+  {
+   "fieldname": "to_tier",
+   "fieldtype": "Int",
+   "label": "To Tier",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_work",
+   "fieldtype": "Section Break",
+   "label": "Assignment"
+  },
+  {
+   "fieldname": "equipment",
+   "fieldtype": "Link",
+   "label": "Equipment",
+   "options": "Equipment",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "assigned_to",
+   "fieldtype": "Link",
+   "label": "Assigned To",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "requested_by",
+   "fieldtype": "Link",
+   "label": "Requested By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "cb3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "completed_at",
+   "fieldtype": "Datetime",
+   "label": "Completed At",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "cancel_reason",
+   "fieldtype": "Small Text",
+   "label": "Cancel or Failure Reason",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-10-26 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Move Order",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "write": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "autoname": "WO-.#####",
+ "naming_rule": "Expression (old style)",
+ "title_field": "container"
+}
