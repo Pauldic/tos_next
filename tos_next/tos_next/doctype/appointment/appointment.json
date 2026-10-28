@@ -260,8 +260,8 @@
   {
    "role": "Carrier Portal User",
    "read": 1,
-   "write": 1,
-   "create": 1
+   "write": 0,
+   "create": 0
   }
  ],
  "sort_field": "modified",

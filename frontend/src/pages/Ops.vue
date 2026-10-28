@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Badge, Button, ErrorMessage, useColorScheme } from 'frappe-ui'
 import { opsAct, opsApi } from '../api'
+import { logout } from '../logout'
 import { useTerminal } from '../composables/useTerminal'
 import { usePolling } from '../composables/usePolling'
 import { useRealtime } from '../composables/useRealtime'
@@ -70,6 +71,7 @@ const minutes = (since?: string) => (since ? Math.max(0, Math.round((now.value -
       <div class="flex items-center gap-2">
         <Button icon="lucide-refresh-cw" aria-label="Refresh" @click="refresh" />
         <Button :icon="resolvedColorScheme === 'dark' ? 'lucide-sun' : 'lucide-moon'" aria-label="Switch light and dark mode" @click="toggleColorScheme" />
+        <Button icon="lucide-log-out" label="Log out" @click="logout" />
       </div>
     </header>
 

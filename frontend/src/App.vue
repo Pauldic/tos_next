@@ -12,6 +12,7 @@ import {
   useColorScheme,
 } from 'frappe-ui'
 import { useTerminal } from './composables/useTerminal'
+import { logout } from './logout'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,7 +71,8 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
                 aria-label="Switch light and dark mode"
                 @click="toggleColorScheme"
               />
-              <Button icon-left="lucide-layout-grid" label="Desk" href="/desk" />
+              <Button icon-left="lucide-layout-grid" label="Desk" href="/app" />
+              <Button icon="lucide-log-out" tooltip="Log out" aria-label="Log out" @click="logout" />
             </div>
           </Sidebar>
         </template>

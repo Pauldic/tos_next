@@ -5,6 +5,7 @@ import { Badge, Button, ErrorMessage, useColorScheme } from 'frappe-ui'
 import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
 import { portalAct, portalApi } from '../api'
+import { logout } from '../logout'
 
 const router = useRouter()
 const { resolvedColorScheme, toggleColorScheme } = useColorScheme()
@@ -50,7 +51,10 @@ const prettyDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString([
         <Button variant="ghost" icon="lucide-arrow-left" aria-label="Back to booking" @click="router.push('/portal')" />
         <h1 class="text-lg-semibold text-ink-gray-9">My fleet</h1>
       </div>
-      <Button :icon="resolvedColorScheme === 'dark' ? 'lucide-sun' : 'lucide-moon'" aria-label="Switch light and dark mode" @click="toggleColorScheme" />
+      <div class="flex items-center gap-2">
+        <Button :icon="resolvedColorScheme === 'dark' ? 'lucide-sun' : 'lucide-moon'" aria-label="Switch light and dark mode" @click="toggleColorScheme" />
+        <Button icon="lucide-log-out" label="Log out" @click="logout" />
+      </div>
     </header>
 
     <ErrorMessage v-if="error" class="mb-4 whitespace-pre-line rounded-5 bg-surface-red-1 p-3" :message="error" />

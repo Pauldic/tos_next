@@ -5,6 +5,7 @@ import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
 import AppointmentPass from '../components/AppointmentPass.vue'
 import { portalAct, portalApi } from '../api'
+import { logout } from '../logout'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -88,11 +89,12 @@ const past = computed(() => appts.value.filter((a) => ['Cancelled', 'Completed',
     <header class="sticky top-0 z-10 -mx-4 mb-5 flex items-center justify-between border-b border-outline-gray-1 bg-surface-base/95 px-4 py-3 backdrop-blur">
       <div class="min-w-0">
         <h1 class="text-lg-semibold text-ink-gray-9">Book a terminal slot</h1>
-        <p class="truncate text-sm text-ink-gray-5">{{ ctx?.terminal_name || 'Carrier portal' }}</p>
+        <p class="truncate text-sm text-ink-gray-5">{{ ctx?.carriers?.length ? ctx.carriers.map((c: any) => c.carrier_name || c.name).join(', ') + ' · ' : '' }}{{ ctx?.terminal_name || 'Carrier portal' }}</p>
       </div>
       <div class="flex items-center gap-2">
         <Button icon-left="lucide-truck" label="My fleet" @click="router.push('/portal/fleet')" />
         <Button :icon="resolvedColorScheme === 'dark' ? 'lucide-sun' : 'lucide-moon'" aria-label="Switch light and dark mode" @click="toggleColorScheme" />
+        <Button icon="lucide-log-out" label="Log out" @click="logout" />
       </div>
     </header>
 
