@@ -68,6 +68,21 @@ async function submitPrompt() {
   else prompt.error = actError.value
 }
 
+// ---- container details for a new container on a visit already under way ----
+const cd = reactive({ open: false, tx: null as any, no: '', type: '', error: '', loading: false })
+async function askContainer(tx: any) {
+  if (!ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
+  Object.assign(cd, { open: true, tx, no: tx.container || '', type: '', error: '', loading: false })
+}
+async function submitContainer() {
+  cd.loading = true; cd.error = ''
+  try {
+    await act('set_container_details', { transaction: cd.tx.name, container_no: cd.no, container_type: cd.type })
+    cd.open = false
+    await refresh()
+  } catch (e: any) { cd.error = e.message } finally { cd.loading = false }
+}
+
 // ---- start a visit ----
 const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', container: '', container_type: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
 const moves = (dir: string) => (dir === 'In' ? ['Export Drop', 'Empty Return'] : ['Import Pickup', 'Empty Pickup'])
@@ -145,6 +160,7 @@ const time = (t?: string) => (t || '').slice(0, 5)
                   <Button v-if="l.transaction.status === 'Processing'" variant="solid" label="Advance" :loading="busy === l.transaction.name + 'advance'" @click="run(l.transaction, 'advance')" />
                   <Button v-if="l.transaction.status === 'Cleared'" variant="solid" label="Let truck through" :loading="busy === l.transaction.name + 'complete'" @click="run(l.transaction, 'complete')" />
                   <Button v-if="l.transaction.status === 'On Hold'" variant="solid" label="Release hold" @click="ask(l.transaction, 'release_hold', 'Release the hold', 'Release note', 'note')" />
+                  <Button v-if="l.direction === 'In' && ['Processing', 'On Hold'].includes(l.transaction.status)" label="Container details" @click="askContainer(l.transaction)" />
                   <Button v-if="['Processing', 'On Hold'].includes(l.transaction.status)" label="Portal read" @click="askOcr(l.transaction)" />
                   <Button v-if="l.transaction.status === 'Processing'" label="Hold" @click="ask(l.transaction, 'hold', 'Hold the truck', 'Reason', 'reason')" />
                   <Button v-if="l.transaction.status === 'Processing'" label="Fail step" theme="red" @click="ask(l.transaction, 'fail_step', 'Fail this step', 'What failed?', 'remarks')" />
@@ -181,6 +197,11 @@ const time = (t?: string) => (t || '').slice(0, 5)
   <Modal :open="prompt.open" :title="prompt.title" :error="prompt.error" confirm-label="Confirm" :loading="!!busy" @close="prompt.open = false" @confirm="submitPrompt">
     <Field :label="prompt.label"><textarea v-if="!prompt.second" v-model="prompt.value" rows="3" class="tos-input" /><input v-else v-model="prompt.value" class="tos-input" /></Field>
     <Field v-if="prompt.second" label="Confidence (%)"><input v-model="prompt.value2" type="number" min="0" max="100" class="tos-input" /></Field>
+  </Modal>
+
+  <Modal :open="cd.open" title="Container details" confirm-label="Save" :loading="cd.loading" :error="cd.error" @close="cd.open = false" @confirm="submitContainer">
+    <Field label="Container number"><input v-model="cd.no" class="tos-input font-mono" autocomplete="off" /></Field>
+    <Field label="Container type" hint="Needed because this container is new to the system."><select v-model="cd.type" class="tos-input"><option value="">Choose…</option><option v-for="t in ctypes" :key="t.name" :value="t.name">{{ t.name }} · {{ t.length_ft }} ft<template v-if="t.description"> · {{ t.description }}</template></option></select></Field>
   </Modal>
 
   <Modal :open="visit.open" :title="'Start visit · Lane ' + (visit.lane?.lane_code || '')" confirm-label="Start visit" :loading="visit.loading" :error="visit.error" wide @close="visit.open = false" @confirm="submitVisit">

@@ -64,6 +64,30 @@ def start_visit(lane, carrier, truck, driver, move_type, appointment=None, overr
 
 
 @frappe.whitelist()
+def set_container_details(transaction, container_no=None, container_type=None):
+    """Fill in the number and type of a NEW container on a Gate In visit that is already under way."""
+    gt = frappe.get_doc("Gate Transaction", transaction)
+    gt.check_permission("write")
+    if gt.direction != "In":
+        frappe.throw(_("Only a Gate In visit can have a new container."))
+    if gt.status not in ("Processing", "On Hold"):
+        frappe.throw(_("This visit is {0}, so its container can no longer be changed.").format(gt.status))
+    if gt.container:
+        frappe.throw(_("This visit already has the container {0}.").format(gt.container))
+    if container_type:
+        if not frappe.db.exists("Container Type", container_type):
+            frappe.throw(_("Unknown container type {0}.").format(container_type))
+        gt.container_type = container_type
+    if container_no:
+        gt.container_no = container_no
+    if not (gt.container_no and gt.container_type):
+        frappe.throw(_("Give both the container number and the container type."))
+    gt.save()
+    gt.add_comment("Info", _("Container details set by {0}: {1} ({2})").format(frappe.session.user, gt.container_no, gt.container_type))
+    return _tx(frappe.get_doc("Gate Transaction", transaction))
+
+
+@frappe.whitelist()
 def container_types():
     return frappe.get_list("Container Type", filters={"is_active": 1}, fields=["name", "description", "length_ft"], order_by="length_ft, name", limit_page_length=0)
 
