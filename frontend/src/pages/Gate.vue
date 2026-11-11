@@ -16,6 +16,7 @@ const queue = ref<any[]>([])
 const overrides = ref<any[]>([])
 const error = ref('')
 const scanning = ref(false)
+const ctypes = ref<any[]>([])
 
 async function refresh() {
   try {
@@ -68,10 +69,11 @@ async function submitPrompt() {
 }
 
 // ---- start a visit ----
-const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', container: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
+const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', container: '', container_type: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
 const moves = (dir: string) => (dir === 'In' ? ['Export Drop', 'Empty Return'] : ['Import Pickup', 'Empty Pickup'])
-function startVisit(lane: any) {
-  Object.assign(visit, { open: true, lane, appointment: '', carrier: '', truck: '', driver: '', move_type: moves(lane.direction)[0], container: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
+async function startVisit(lane: any) {
+  if (!ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
+  Object.assign(visit, { open: true, lane, appointment: '', carrier: '', truck: '', driver: '', move_type: moves(lane.direction)[0], container: '', container_type: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
 }
 const queueFor = computed(() => queue.value.filter((a) => visit.lane && moves(visit.lane.direction).includes(a.move_type)))
 function pickAppointment() {
@@ -87,7 +89,7 @@ async function submitVisit() {
   try {
     await act('start_visit', {
       lane: visit.lane.name, carrier: visit.carrier, truck: visit.truck, driver: visit.driver, move_type: visit.move_type,
-      appointment: visit.appointment, override: visit.override, container: visit.container, booking_ref: visit.booking_ref, seal_no: visit.seal_no,
+      appointment: visit.appointment, override: visit.override, container: visit.container, container_type: visit.container_type, booking_ref: visit.booking_ref, seal_no: visit.seal_no,
     })
     visit.open = false
     await refresh()
@@ -191,7 +193,10 @@ const time = (t?: string) => (t || '').slice(0, 5)
     <PartyPicker v-model:carrier="visit.carrier" v-model:truck="visit.truck" v-model:driver="visit.driver" />
     <div class="grid grid-cols-2 gap-3">
       <Field label="Move"><select v-model="visit.move_type" class="tos-input"><option v-for="m in moves(visit.lane?.direction || 'In')" :key="m" :value="m">{{ m }}</option></select></Field>
-      <Field label="Container"><ContainerPick v-model="visit.container" /></Field>
+      <Field label="Container" :hint="visit.lane?.direction === 'In' ? 'Pick one already in the system, or type a new number.' : undefined"><ContainerPick v-model="visit.container" /></Field>
+      <Field v-if="visit.lane?.direction === 'In' && visit.container" label="Container type (new containers only)" hint="Needed when the number is not in the system yet.">
+        <select v-model="visit.container_type" class="tos-input"><option value="">Choose…</option><option v-for="t in ctypes" :key="t.name" :value="t.name">{{ t.name }} · {{ t.length_ft }} ft<template v-if="t.description"> · {{ t.description }}</template></option></select>
+      </Field>
       <Field label="Booking reference"><input v-model="visit.booking_ref" class="tos-input" /></Field>
       <Field label="Seal number"><input v-model="visit.seal_no" class="tos-input" /></Field>
     </div>

@@ -15,6 +15,9 @@ const loading = ref(false)
 const starting = ref(false)
 const lane = ref('')
 const override = ref('')
+const newNo = ref('')
+const newType = ref('')
+const ctypes = ref<any[]>([])
 const input = ref<HTMLInputElement>()
 
 const video = ref<HTMLVideoElement>()
@@ -24,7 +27,7 @@ let stream: MediaStream | null = null
 let timer = 0
 
 function reset() {
-  code.value = ''; result.value = null; error.value = ''; lane.value = ''; override.value = ''; stopCam(); camError.value = ''
+  code.value = ''; result.value = null; error.value = ''; lane.value = ''; override.value = ''; newNo.value = ''; newType.value = ''; stopCam(); camError.value = ''
 }
 watch(() => props.open, async (o) => { if (o) { reset(); await nextTick(); input.value?.focus() } else stopCam() })
 onBeforeUnmount(stopCam)
@@ -35,6 +38,7 @@ async function lookup(text = code.value) {
   try {
     result.value = await gateApi('scan_pass', { code: text, terminal: props.terminal })
     lane.value = openLanes.value[0]?.name || ''
+    if (result.value.direction === 'In' && !result.value.container && !ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
     override.value = matching.value[0]?.name || ''
   } catch (e: any) {
     error.value = e.message
@@ -47,35 +51,55 @@ const openLanes = computed(() => props.lanes.filter((l) => result.value && l.dir
 const matching = computed(() => props.overrides.filter((o) => result.value && o.override_type === 'Outside Slot Window' && (o.appointment === result.value.appointment)))
 const blocked = computed(() => !!result.value?.blockers?.length)
 const needsOverride = computed(() => !!result.value?.needs_override)
-const canStart = computed(() => result.value && !blocked.value && lane.value && (!needsOverride.value || override.value))
+const isNew = computed(() => result.value?.direction === 'In' && !result.value?.container)
+const canStart = computed(() => result.value && !blocked.value && lane.value && (!needsOverride.value || override.value) && (!isNew.value || newType.value))
 
 async function start() {
   const r = result.value
   starting.value = true; error.value = ''
   try {
-    await act('start_visit', { lane: lane.value, carrier: r.carrier, truck: r.truck, driver: r.driver, move_type: r.move_type, appointment: r.appointment, override: needsOverride.value ? override.value : '', container: r.container, booking_ref: r.booking_ref })
+    await act('start_visit', { lane: lane.value, carrier: r.carrier, truck: r.truck, driver: r.driver, move_type: r.move_type, appointment: r.appointment, override: needsOverride.value ? override.value : '', container: r.container || newNo.value, container_type: newType.value, booking_ref: r.booking_ref })
     emit('started'); emit('close')
   } catch (e: any) { error.value = e.message } finally { starting.value = false }
 }
 
-// ---- camera (needs https or localhost, and a browser that has BarcodeDetector) ----
+// ---- camera: needs https or localhost. Uses the browser's own QR reader when it has one, else the jsQR library ----
 async function startCam() {
   camError.value = ''
-  const BD = (window as any).BarcodeDetector
-  if (!BD) { camError.value = 'This browser cannot read QR codes from the camera. Use a handheld scanner, or type the code.'; return }
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    camError.value = 'The camera only works on a secure address (https:// or localhost). This page is on plain http, so the browser blocks the camera. Type the code instead, or open the site over https.'
+    return
+  }
   try {
+    const BD = (window as any).BarcodeDetector
+    const det = BD ? new BD({ formats: ['qr_code'] }) : null
+    const jsQR = det ? null : (await import('jsqr')).default
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
     camOn.value = true
     await nextTick()
     video.value!.srcObject = stream
     await video.value!.play()
-    const det = new BD({ formats: ['qr_code'] })
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d', { willReadFrequently: true })!
     let last = 0
     const loop = async (t: number) => {
       if (!camOn.value) return
       if (t - last > 250) {
         last = t
-        try { const codes = await det.detect(video.value!); if (codes[0]?.rawValue) { const v = codes[0].rawValue; stopCam(); code.value = v; lookup(v); return } } catch {}
+        try {
+          let v = ''
+          const vid = video.value!
+          if (det) {
+            const codes = await det.detect(vid)
+            v = codes[0]?.rawValue || ''
+          } else if (vid.videoWidth) {
+            canvas.width = vid.videoWidth; canvas.height = vid.videoHeight
+            ctx.drawImage(vid, 0, 0)
+            const img = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            v = jsQR!(img.data, img.width, img.height)?.data || ''
+          }
+          if (v) { stopCam(); code.value = v; lookup(v); return }
+        } catch {}
       }
       timer = requestAnimationFrame(loop)
     }
@@ -134,6 +158,10 @@ const windowText = computed(() => {
           <select v-model="lane" class="tos-input"><option v-for="l in openLanes" :key="l.name" :value="l.name">Lane {{ l.lane_code }}</option></select>
           <p v-if="!openLanes.length" class="mt-1 text-sm text-ink-amber-3">No open Gate {{ result.direction }} lane right now.</p>
         </Field>
+        <template v-if="isNew">
+          <Field label="Container number (optional now)" hint="The truck's container number, if you can read it. If you leave it empty, record it at the portal read step."><input v-model="newNo" class="tos-input font-mono" autocomplete="off" /></Field>
+          <Field label="Container type" hint="Needed because this container is new to the system."><select v-model="newType" class="tos-input"><option value="">Choose…</option><option v-for="t in ctypes" :key="t.name" :value="t.name">{{ t.name }} · {{ t.length_ft }} ft<template v-if="t.description"> · {{ t.description }}</template></option></select></Field>
+        </template>
         <Field v-if="needsOverride" label="Approved override" :hint="matching.length ? 'This truck is outside its slot window, so an approved override is needed.' : undefined">
           <select v-model="override" class="tos-input"><option value="">Choose…</option><option v-for="o in matching" :key="o.name" :value="o.name">{{ o.name }} · valid until {{ String(o.valid_until).slice(11, 16) }}</option></select>
           <p v-if="!matching.length" class="mt-1 text-sm text-ink-amber-3">No approved override for {{ result.appointment }}. A clerk can request one under Appointments → Request override, then a supervisor approves it.</p>

@@ -50,14 +50,22 @@ def gate_action(transaction, action, **args):
 
 @frappe.whitelist()
 def start_visit(lane, carrier, truck, driver, move_type, appointment=None, override=None,
-                container=None, container_no=None, booking_ref=None, seal_no=None, gross_weight_kg=None):
+                container=None, container_no=None, container_type=None, booking_ref=None, seal_no=None, gross_weight_kg=None):
+    # A container typed at the gate that is not in the system yet is a NEW container: it needs a number and a type.
+    if container and not frappe.db.exists("Container", container):
+        container_no, container = container, None
     doc = frappe.get_doc({
         "doctype": "Gate Transaction", "lane": lane, "carrier": carrier, "truck": truck, "driver": driver,
         "move_type": move_type, "appointment": appointment or None, "override": override or None,
-        "container": container or None, "container_no": container_no or None, "booking_ref": booking_ref or None,
+        "container": container or None, "container_no": container_no or None, "container_type": container_type or None, "booking_ref": booking_ref or None,
         "seal_no": seal_no or None, "gross_weight_kg": gross_weight_kg or None,
     }).insert()
     return _tx(doc)
+
+
+@frappe.whitelist()
+def container_types():
+    return frappe.get_list("Container Type", filters={"is_active": 1}, fields=["name", "description", "length_ft"], order_by="length_ft, name", limit_page_length=0)
 
 
 @frappe.whitelist()
