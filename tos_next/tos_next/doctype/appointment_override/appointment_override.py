@@ -7,9 +7,10 @@ from frappe.model.document import Document
 from frappe.utils import add_to_date, get_datetime, now_datetime
 
 from tos_next.realtime import publish
+from tos_next.settings import company, second_approver_required
+from tos_next.settings import get as setting
 
 APPROVER_ROLES = {"Gate Supervisor", "Terminal Admin", "System Manager"}
-VALID_HOURS = 4          # an approved override can be used for this long
 PENDING_HOURS = 4        # a request nobody decides on expires after this long
 FINAL = ("Rejected", "Used", "Expired")
 
@@ -28,8 +29,9 @@ class AppointmentOverride(Document):
             self.status = "Pending"
             self.requested_by = frappe.session.user
             self.requested_on = now_datetime()
-            if len((self.reason or "").strip()) < 20:
-                frappe.throw(_("Please explain the reason in at least 20 characters."))
+            minimum = company("min_override_reason_length")
+            if len((self.reason or "").strip()) < minimum:
+                frappe.throw(_("Please explain the reason in at least {0} characters.").format(minimum))
             if self.override_type == "Over Capacity" and not self.slot:
                 frappe.throw(_("Choose the slot for an Over Capacity override."))
             if self.override_type in ("Outside Slot Window", "Details Changed") and not self.appointment:
@@ -61,7 +63,7 @@ class AppointmentOverride(Document):
             frappe.throw(_("This override is already {0}.").format(self.status))
         if not (note or "").strip():
             frappe.throw(_("A decision note is required."))
-        if frappe.db.get_value("Terminal", self.terminal, "override_needs_second_approver") \
+        if second_approver_required(self.terminal) \
                 and frappe.session.user == self.requested_by and "System Manager" not in frappe.get_roles():
             frappe.throw(_("A different person must approve an override you requested."))
 
@@ -72,7 +74,7 @@ class AppointmentOverride(Document):
         self.approved_by = frappe.session.user
         self.approved_on = now_datetime()
         self.decision_note = note
-        self.valid_until = add_to_date(now_datetime(), hours=VALID_HOURS)
+        self.valid_until = add_to_date(now_datetime(), hours=setting("override_valid_hours", self.terminal))
         self.save()
         self.add_comment("Info", _("Approved by {0}: {1}").format(frappe.session.user, note))
         publish("override_decided", {"override": self.name, "status": "Approved"}, self.terminal)

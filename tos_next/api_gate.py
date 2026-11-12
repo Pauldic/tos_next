@@ -10,7 +10,7 @@ from frappe.utils import add_to_date, now_datetime
 
 from tos_next.api import _terminal
 from tos_next.tos_next.doctype.appointment.appointment import slot_window
-from tos_next.tos_next.doctype.gate_transaction.gate_transaction import EARLY_MINUTES, LATE_MINUTES
+from tos_next.settings import gate_window
 
 # action -> the only arguments the screen may pass to that Gate Transaction method
 GATE_ACTIONS = {
@@ -198,7 +198,8 @@ def scan_pass(code, terminal=None):
         frappe.throw(_("{0} was marked no-show. A supervisor must decide what to do.").format(a.name))
 
     start, end = slot_window(frappe.get_cached_doc("Slot Capacity", a.slot))
-    opens, closes, now = add_to_date(start, minutes=-EARLY_MINUTES), add_to_date(end, minutes=LATE_MINUTES), now_datetime()
+    early, late = gate_window(a.terminal)
+    opens, closes, now = add_to_date(start, minutes=-early), add_to_date(end, minutes=late), now_datetime()
     state = "early" if now < opens else "late" if now > closes else "ok"
     minutes = int((opens - now).total_seconds() // 60) if state == "early" else int((now - closes).total_seconds() // 60) if state == "late" else 0
 

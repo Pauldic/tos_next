@@ -6,6 +6,8 @@ Call as /api/method/tos_next.api_ops.<name>.
 import frappe
 from frappe import _
 
+from tos_next import settings as tos_settings
+from tos_next import yard
 from tos_next.api import _terminal
 
 OPEN = ("Assigned", "In Progress")
@@ -25,7 +27,17 @@ def ops_board(terminal=None):
                              order_by="status desc, priority desc, creation asc", limit_page_length=50)
     recent = frappe.get_list("Move Order", filters={"terminal": terminal, "assigned_to": me, "status": "Completed"}, fields=ORDER_FIELDS,
                              order_by="completed_at desc", limit_page_length=3)
-    return {"user": me, "equipment": mine, "available": free, "orders": orders, "recent": recent}
+    # Queued jobs nobody has taken yet, that the machine I am signed on to can actually do
+    open_jobs = []
+    if mine and tos_settings.company("operators_can_take_jobs"):
+        eq = mine[0]
+        queued = frappe.get_list("Move Order", filters={"terminal": terminal, "status": "Queued"}, fields=ORDER_FIELDS,
+                                 order_by="priority desc, creation asc", limit_page_length=30)
+        for o in queued:
+            if not eq.handles_forty and (frappe.db.get_value("Container", o.container, "slot_span") or 1) == 2:
+                continue
+            open_jobs.append(o)
+    return {"user": me, "equipment": mine, "available": free, "orders": orders, "recent": recent, "open_jobs": open_jobs}
 
 
 @frappe.whitelist()
@@ -36,6 +48,37 @@ def move_action(order, action):
     doc.check_permission("write")
     getattr(doc, action)()
     return frappe.db.get_value("Move Order", order, ORDER_FIELDS, as_dict=True)
+
+
+@frappe.whitelist()
+def claim_order(order):
+    """An operator takes a queued job for the machine they are signed on to. Same rules as a planner's assignment."""
+    if not tos_settings.company("operators_can_take_jobs"):
+        frappe.throw(_("Taking jobs is switched off. A planner assigns the orders."))
+    me = frappe.session.user
+    doc = frappe.get_doc("Move Order", order)
+    doc.check_permission("write")
+    eq_name = frappe.db.get_value("Equipment", {"current_operator": me, "terminal": doc.terminal}, "name")
+    if not eq_name:
+        frappe.throw(_("Sign on to a machine first."))
+    eq = frappe.get_doc("Equipment", eq_name)
+    if doc.status != "Queued":
+        frappe.throw(_("Order {0} is {1}. Someone else may have taken it.").format(doc.name, doc.status))
+    if eq.status not in ("Available", "Working"):
+        frappe.throw(_("Equipment {0} is {1}.").format(eq.name, eq.status))
+    c = frappe.get_cached_doc("Container", doc.container)
+    if c.slot_span == 2 and not eq.handles_forty:
+        frappe.throw(_("{0} cannot handle 40 ft containers.").format(eq.name))
+    if doc.to_stack:
+        _names, tier = yard.check_can_place(doc.to_stack, c.container_type)
+        if tier > eq.max_lift_tier:
+            frappe.throw(_("{0} cannot reach tier {1}.").format(eq.name, tier))
+    doc.equipment = eq.name
+    doc.assigned_to = me
+    doc.status = "Assigned"
+    doc.save()
+    doc.add_comment("Info", _("Taken by {0} on {1}").format(me, eq.name))
+    return frappe.db.get_value("Move Order", doc.name, ORDER_FIELDS, as_dict=True)
 
 
 @frappe.whitelist()

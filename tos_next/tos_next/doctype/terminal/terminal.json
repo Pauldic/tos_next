@@ -16,7 +16,13 @@
   "require_appointment",
   "cb2",
   "override_needs_second_approver",
-  "late_grace_minutes"
+  "late_grace_minutes",
+  "sb_company_overrides",
+  "early_arrival_minutes",
+  "late_arrival_minutes",
+  "cb_company_overrides",
+  "override_valid_hours",
+  "auto_create_gate_in_order"
  ],
  "fields": [
   {
@@ -95,11 +101,50 @@
    "fieldname": "late_grace_minutes",
    "fieldtype": "Int",
    "label": "Late After (minutes)",
-   "default": "15"
+   "default": "0",
+   "description": "0 = use the company setting (TOS Settings)."
+  },
+  {
+   "fieldname": "sb_company_overrides",
+   "fieldtype": "Section Break",
+   "label": "Overrides of the Company Settings",
+   "description": "Leave a number at 0 to use the value in TOS Settings."
+  },
+  {
+   "fieldname": "early_arrival_minutes",
+   "fieldtype": "Int",
+   "label": "Earliest Arrival (minutes)",
+   "default": "0",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "late_arrival_minutes",
+   "fieldtype": "Int",
+   "label": "Latest Arrival (minutes)",
+   "default": "0",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "cb_company_overrides",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "override_valid_hours",
+   "fieldtype": "Int",
+   "label": "Approved Override Valid For (hours)",
+   "default": "0",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "auto_create_gate_in_order",
+   "fieldtype": "Select",
+   "label": "Create Yard Move Order After Gate In",
+   "options": "Use company setting\nYes\nNo",
+   "default": "Use company setting"
   }
  ],
  "links": [],
- "modified": "2026-10-26 07:00:00.000000",
+ "modified": "2026-11-12 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "Terminal",

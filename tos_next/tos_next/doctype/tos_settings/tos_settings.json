@@ -1,0 +1,192 @@
+{
+ "actions": [],
+ "creation": "2026-11-12 08:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "sb_company",
+  "company_name",
+  "default_terminal",
+  "cb_company",
+  "portal_enabled",
+  "strict_iso6346",
+  "sb_gate",
+  "early_arrival_minutes",
+  "late_arrival_minutes",
+  "cb_gate",
+  "late_grace_minutes",
+  "sb_override",
+  "override_valid_hours",
+  "min_override_reason_length",
+  "cb_override",
+  "override_needs_second_approver",
+  "sb_yard",
+  "auto_create_gate_in_order",
+  "gate_in_order_priority",
+  "cb_yard",
+  "operators_can_take_jobs"
+ ],
+ "fields": [
+  {
+   "fieldname": "sb_company",
+   "fieldtype": "Section Break",
+   "label": "Company and System"
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Company Name",
+   "description": "Shown at the top of the TOS menu and on the carrier page."
+  },
+  {
+   "fieldname": "default_terminal",
+   "fieldtype": "Link",
+   "label": "Default Terminal",
+   "options": "Terminal",
+   "description": "Used when a screen does not say which terminal."
+  },
+  {
+   "fieldname": "cb_company",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "portal_enabled",
+   "fieldtype": "Check",
+   "label": "Carrier Portal On",
+   "default": "1",
+   "description": "Switch off to stop carriers booking. Staff are not affected."
+  },
+  {
+   "fieldname": "strict_iso6346",
+   "fieldtype": "Check",
+   "label": "Reject Wrong Container Check Digits",
+   "default": "0",
+   "description": "Off: a wrong check digit only warns. On: it is refused."
+  },
+  {
+   "fieldname": "sb_gate",
+   "fieldtype": "Section Break",
+   "label": "Gate and Appointments"
+  },
+  {
+   "fieldname": "early_arrival_minutes",
+   "fieldtype": "Int",
+   "label": "Earliest Arrival (minutes before slot)",
+   "default": "30",
+   "non_negative": 1,
+   "description": "A truck earlier than this needs an override."
+  },
+  {
+   "fieldname": "late_arrival_minutes",
+   "fieldtype": "Int",
+   "label": "Latest Arrival (minutes after slot ends)",
+   "default": "60",
+   "non_negative": 1,
+   "description": "A truck later than this needs an override."
+  },
+  {
+   "fieldname": "cb_gate",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "late_grace_minutes",
+   "fieldtype": "Int",
+   "label": "Late After (minutes)",
+   "default": "15",
+   "non_negative": 1,
+   "description": "An appointment is marked Late this long after its slot starts."
+  },
+  {
+   "fieldname": "sb_override",
+   "fieldtype": "Section Break",
+   "label": "Overrides and Approvals"
+  },
+  {
+   "fieldname": "override_valid_hours",
+   "fieldtype": "Int",
+   "label": "Approved Override Valid For (hours)",
+   "default": "4",
+   "non_negative": 1,
+   "description": "After this time an unused override expires."
+  },
+  {
+   "fieldname": "min_override_reason_length",
+   "fieldtype": "Int",
+   "label": "Minimum Reason Length (characters)",
+   "default": "20",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "cb_override",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "override_needs_second_approver",
+   "fieldtype": "Check",
+   "label": "Override Needs a Different Approver",
+   "default": "1",
+   "description": "The person who asks cannot approve it. A terminal can also require this for itself."
+  },
+  {
+   "fieldname": "sb_yard",
+   "fieldtype": "Section Break",
+   "label": "Yard Automation"
+  },
+  {
+   "fieldname": "auto_create_gate_in_order",
+   "fieldtype": "Check",
+   "label": "Create the Yard Move Order After Gate In",
+   "default": "0",
+   "description": "When a truck is admitted, a From Gate In move order is created for its new container. A terminal can choose Yes or No for itself."
+  },
+  {
+   "fieldname": "gate_in_order_priority",
+   "fieldtype": "Select",
+   "label": "Priority of Those Orders",
+   "options": "Normal\nHigh\nUrgent",
+   "default": "Normal"
+  },
+  {
+   "fieldname": "cb_yard",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "operators_can_take_jobs",
+   "fieldtype": "Check",
+   "label": "Operators Can Take Open Jobs",
+   "default": "1",
+   "description": "Off: only a planner assigns move orders."
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-12 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "TOS Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

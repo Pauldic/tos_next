@@ -7,6 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import add_to_date, date_diff, get_datetime, get_time, now_datetime, time_diff_in_seconds
 
 from tos_next import yard
+from tos_next.settings import auto_create_order, company, gate_window
 from tos_next.tos_next.doctype.appointment.appointment import slot_window
 from tos_next.tos_next.doctype.appointment_override.appointment_override import get_valid_override, mark_used
 from tos_next.tos_next.doctype.container.container import normalise_no
@@ -14,8 +15,6 @@ from tos_next.realtime import publish
 
 IN_STEPS = ["Arrival", "OCR and RFID", "Documents", "Damage Scan", "Admitted"]
 OUT_STEPS = ["Arrival", "OCR and RFID", "Seal Check", "Documents", "Released"]
-EARLY_MINUTES = 30   # earliest a truck may arrive before its slot starts
-LATE_MINUTES = 60    # latest a truck may arrive after its slot ends
 SUPERVISOR_ROLES = {"Gate Supervisor", "Terminal Admin", "System Manager"}
 IN_MOVES = ("Export Drop", "Empty Return")
 
@@ -64,7 +63,8 @@ class GateTransaction(Document):
                 needs.append("Details Changed")
             start, end = slot_window(frappe.get_cached_doc("Slot Capacity", appt.slot))
             now = now_datetime()
-            if now < add_to_date(start, minutes=-EARLY_MINUTES) or now > add_to_date(end, minutes=LATE_MINUTES):
+            early, late = gate_window(self.terminal)
+            if now < add_to_date(start, minutes=-early) or now > add_to_date(end, minutes=late):
                 needs.append("Outside Slot Window")
             self.move_type = appt.move_type
             self.container = self.container or appt.container
@@ -268,6 +268,30 @@ class GateTransaction(Document):
             frappe.db.set_value("Appointment", self.appointment, {"status": "Completed", "completed_at": self.exited_at})
             publish("appointment_status", {"appointment": self.appointment, "status": "Completed"}, self.terminal)
         self.announce()
+        if self.direction == "In" and auto_create_order(self.terminal):
+            self.create_yard_order()
+
+    def create_yard_order(self):
+        """Settings: 'Create the Yard Move Order After Gate In'. The admission is already done, so a failure here
+        is written on the visit and logged; it never undoes the admission."""
+        if not self.container or frappe.db.get_value("Container", self.container, "yard_stack"):
+            return
+        point = "tos_auto_order"
+        frappe.db.savepoint(point)
+        try:
+            target = yard.suggest_target(self.container)
+            if not target:
+                frappe.throw(_("No free stack found for {0}.").format(self.container))
+            order = frappe.get_doc({
+                "doctype": "Move Order", "container": self.container, "move_type": "From Gate In", "to_stack": target,
+                "priority": company("gate_in_order_priority"),
+                "notes": _("Created automatically after Gate In {0}").format(self.name),
+            }).insert(ignore_permissions=True)
+            self.add_comment("Info", _("Move order {0} created automatically (to {1}).").format(order.name, target))
+        except Exception as e:
+            frappe.db.rollback(save_point=point)
+            frappe.log_error(title="TOS: automatic move order failed", message=frappe.get_traceback())
+            self.add_comment("Info", _("The move order could not be created automatically: {0}. A planner can create it by hand.").format(e))
 
     def _admit(self):
         if self.container:

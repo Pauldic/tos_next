@@ -21,6 +21,7 @@ const { terminals, selected, load, select } = useTerminal()
 
 onMounted(load)
 
+const companyName: string = (window as any).company_name || ''
 const nav = [
   { label: 'Dashboard', to: '/', icon: 'lucide-layout-dashboard' },
   { label: '3D Yard', to: '/yard', icon: 'lucide-boxes' },
@@ -40,7 +41,7 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
       <DesktopShell>
         <template #sidebar>
           <Sidebar class="border-r" :collapsible="false" width="14rem">
-            <SidebarHeader title="TOS Next" subtitle="Terminal Operating System" />
+            <SidebarHeader :title="companyName || 'TOS Next'" subtitle="Terminal Operating System" />
 
             <div class="px-3 pb-2">
               <label class="mb-1 block text-xs text-ink-gray-5" for="terminal">Terminal</label>
@@ -72,6 +73,7 @@ const isActive = (to: string) => (to === '/' ? route.path === '/' : route.path.s
                 @click="toggleColorScheme"
               />
               <Button icon-left="lucide-layout-grid" label="Desk" href="/app" />
+              <Button icon="lucide-settings" tooltip="Settings" aria-label="Settings" href="/app/tos-settings" />
               <Button icon="lucide-log-out" tooltip="Log out" aria-label="Log out" @click="logout" />
             </div>
           </Sidebar>

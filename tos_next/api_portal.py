@@ -13,7 +13,7 @@ from frappe import _
 from frappe.utils import add_days, get_time, getdate, now_datetime, nowdate
 
 from tos_next.api import _terminal
-from tos_next.tos_next.doctype.gate_transaction.gate_transaction import EARLY_MINUTES, LATE_MINUTES
+from tos_next import settings as tos_settings
 
 STAFF = {"System Manager", "Terminal Admin", "Appointment Planner"}
 IN_MOVES = ("Export Drop", "Empty Return")
@@ -21,6 +21,8 @@ OUT_MOVES = ("Import Pickup", "Empty Pickup")
 
 
 def _carriers():
+    if not tos_settings.company("portal_enabled") and not STAFF.intersection(frappe.get_roles()):
+        frappe.throw(_("The carrier portal is switched off at the moment. Please contact the terminal."), frappe.PermissionError)
     mine = frappe.get_all("User Permission", filters={"user": frappe.session.user, "allow": "Carrier"}, pluck="for_value")
     if mine:
         return mine
@@ -42,12 +44,14 @@ def _hhmm(t):
 def portal_context(terminal=None):
     cars = _carriers()
     terminal = _terminal(terminal)
+    early, late = tos_settings.gate_window(terminal)
     return {
+        "company_name": tos_settings.company("company_name"),
         "terminal": terminal,
         "terminal_name": frappe.db.get_value("Terminal", terminal, "terminal_name"),
         "require_appointment": frappe.db.get_value("Terminal", terminal, "require_appointment"),
-        "early_minutes": EARLY_MINUTES,
-        "late_minutes": LATE_MINUTES,
+        "early_minutes": early,
+        "late_minutes": late,
         "carriers": frappe.get_all("Carrier", filters={"name": ["in", cars]}, fields=["name", "carrier_name", "is_blocked", "block_reason"]),
         "trucks": frappe.get_all("Truck", filters={"carrier": ["in", cars], "is_blocked": 0}, fields=["name", "carrier", "max_container_length"], order_by="name"),
         "drivers": frappe.get_all("Driver", filters={"carrier": ["in", cars], "is_blocked": 0}, fields=["name", "full_name", "carrier"], order_by="full_name"),

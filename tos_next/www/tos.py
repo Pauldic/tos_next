@@ -11,11 +11,16 @@ def get_context(context):
         "user": frappe.session.user,
         "site_name": frappe.local.site,
         "socketio_port": frappe.conf.get("socketio_port") or 9000,
+        "company_name": frappe.db.get_single_value("TOS Settings", "company_name") or "",
     })
-
+    
+    # The frontend reads these as globals on `window`. frappe-ui sends csrf_token with every request.
+    # site_name and socketio_port let the 3D yard connect to realtime.
     context.boot = {
         "csrf_token": frappe.sessions.get_csrf_token(),
         "user": frappe.session.user,
         "site_name": frappe.local.site,
         "socketio_port": frappe.conf.get("socketio_port") or 9000,
+        "company_name": frappe.db.get_single_value("TOS Settings", "company_name") or "",
     }
+

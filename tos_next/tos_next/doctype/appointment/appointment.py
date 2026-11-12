@@ -10,6 +10,7 @@ from frappe.utils import add_to_date, get_datetime, get_time, getdate, now_datet
 
 from tos_next.tos_next.doctype.appointment_override.appointment_override import get_valid_override, mark_used
 from tos_next.realtime import publish
+from tos_next.settings import get as setting
 
 IN_MOVES = ("Export Drop", "Empty Return")
 ACTIVE = ("Booked", "Arrived", "In Progress", "Late")
@@ -150,7 +151,7 @@ def mark_late_and_no_show():
     for r in rows:
         slot = frappe.get_cached_doc("Slot Capacity", r.slot)
         start, end = slot_window(slot)
-        grace = graces.setdefault(r.terminal, frappe.db.get_value("Terminal", r.terminal, "late_grace_minutes") or 15)
+        grace = graces.setdefault(r.terminal, setting("late_grace_minutes", r.terminal))
         if now >= end:
             frappe.db.set_value("Appointment", r.name, "status", "No-show")
             frappe.db.sql("update `tabSlot Capacity` set booked = greatest(booked - 1, 0) where name = %s", r.slot)

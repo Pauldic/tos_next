@@ -31,7 +31,7 @@ async function load() {
   try {
     const s = (await tos('yard_snapshot', { terminal: terminal.value })) as Snapshot
     snap.value = s
-    scene?.setData(s, { ...filter })
+    scene?.setData(s, { ...filter }) 
     if (picked.value) loadDetail(picked.value)
     error.value = ''
   } catch (e: any) { error.value = e.message } finally { loading.value = false; inFlight = false }

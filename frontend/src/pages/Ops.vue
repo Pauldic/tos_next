@@ -10,7 +10,7 @@ import { useRealtime } from '../composables/useRealtime'
 const { selected, current } = useTerminal()
 const { resolvedColorScheme, toggleColorScheme } = useColorScheme()
 
-const board = ref<any>({ user: '', equipment: [], available: [], orders: [], recent: [] })
+const board = ref<any>({ user: '', equipment: [], available: [], orders: [], recent: [], open_jobs: [] })
 const error = ref('')
 const busy = ref('')
 const loaded = ref(false)
@@ -41,6 +41,7 @@ async function run(key: string, fn: () => Promise<unknown>) {
   error.value = ''
   try { await fn(); await refresh() } catch (e: any) { error.value = e.message } finally { busy.value = '' }
 }
+const take = (o: any) => run('t' + o.name, () => opsAct('claim_order', { order: o.name }))
 const start = (o: any) => run('s' + o.name, () => opsAct('move_action', { order: o.name, action: 'start' }))
 function complete(o: any) {
   // a second tap within 4 seconds confirms, so a pocket tap cannot finish a move
@@ -121,6 +122,24 @@ const minutes = (since?: string) => (since ? Math.max(0, Math.round((now.value -
       <Button class="mt-4 !h-14 w-full !text-lg" variant="solid" theme="green" :loading="busy === 'c' + active.name" :label="confirming === active.name ? 'Tap again to confirm' : 'Complete move'" @click="complete(active)" />
     </section>
 
+    <!-- jobs nobody has taken yet -->
+    <section v-if="myEq && board.open_jobs.length" class="mb-4">
+      <h2 class="mb-2 text-base-medium text-ink-gray-9">Open jobs <span class="text-ink-gray-5">· {{ board.open_jobs.length }}</span></h2>
+      <ul class="space-y-3">
+        <li v-for="o in board.open_jobs" :key="o.name" class="rounded-6 border border-outline-gray-1 bg-surface-white p-4 shadow-sm">
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <p class="break-all text-lg-semibold text-ink-gray-9">{{ o.container }}</p>
+              <p class="text-sm text-ink-gray-5">{{ o.length_ft }} ft · {{ o.move_type }}</p>
+            </div>
+            <Badge :theme="prioTheme(o.priority)" :label="o.priority" />
+          </div>
+          <p class="mt-2 text-sm text-ink-gray-7">{{ spot(o.from_stack, o.from_tier) }} → {{ spot(o.to_stack, o.to_tier) }}</p>
+          <Button class="mt-3 !h-12 w-full" :loading="busy === 't' + o.name" label="Take this job" @click="take(o)" />
+        </li>
+      </ul>
+    </section>
+
     <!-- next jobs -->
     <section class="mb-4">
       <h2 class="mb-2 text-base-medium text-ink-gray-9">Up next <span class="text-ink-gray-5">· {{ queued.length }}</span></h2>
@@ -137,7 +156,7 @@ const minutes = (since?: string) => (since ? Math.max(0, Math.round((now.value -
           <Button class="mt-3 !h-12 w-full" variant="solid" :disabled="!!active" :loading="busy === 's' + o.name" :label="active ? 'Finish the current move first' : 'Start'" @click="start(o)" />
         </li>
         <li v-if="loaded && !queued.length && !active" class="rounded-6 border border-dashed border-outline-gray-2 p-8 text-center text-sm text-ink-gray-5">
-          {{ myEq ? 'No jobs for you right now. This page updates by itself.' : 'Sign on to a machine to receive jobs.' }}
+          {{ myEq ? (board.open_jobs.length ? 'Take an open job above to start it.' : 'No jobs for you right now. This page updates by itself.') : 'Sign on to a machine to receive jobs.' }}
         </li>
       </ul>
     </section>

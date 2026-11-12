@@ -8,6 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate, now_datetime, date_diff
 
+from tos_next.settings import company
 from tos_next.yard import POSITION_FLAG
 
 _VALUES = {}
@@ -53,8 +54,8 @@ class Container(Document):
         ok = iso6346_check_digit(no[:10]) == int(no[10])
         if not ok:
             msg = _("Check digit of {0} does not match ISO 6346.").format(no)
-            # Set "meridian_strict_iso6346": 1 in site_config.json to make this an error.
-            if frappe.conf.get("meridian_strict_iso6346"):
+            # TOS Settings -> "Reject Wrong Container Check Digits" turns this warning into an error.
+            if company("strict_iso6346"):
                 frappe.throw(msg)
             frappe.msgprint(msg, indicator="orange", alert=True)
 
@@ -74,7 +75,7 @@ class Container(Document):
         before = self.get_doc_before_save()
         if before and not frappe.flags.get(POSITION_FLAG):
             for f in ("yard_stack", "partner_stack", "tier"):
-                if (before.get(f) or None) != (self.get(f) or None):
+                if before.get(f) != self.get(f):
                     frappe.throw(_("Position can only change through a Move Order or a gate transaction."))
         if self.status != "On Terminal" and self.yard_stack and not frappe.flags.get(POSITION_FLAG):
             frappe.throw(_("Only containers on the terminal can sit in the yard."))
