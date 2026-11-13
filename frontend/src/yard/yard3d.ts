@@ -1,13 +1,17 @@
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { buildLayoutItems, layoutBounds, surfaceColour, type YardLayout } from './layoutRender'
+import { LabelAtlas, REAL, buildContainerGeometry, buildContainerMaterial } from './containerModel'
 
 // 1 unit = 1 metre. A slot is one 20 ft bay; a 40 ft container spans two neighbouring bays.
-const SLOT = 6.4
-const ROW = 3.2
-const TIER_H = 2.7
 const WIDTH = 2.44
-const BLOCK_GAP = 16
-const COLUMNS = 2
+// Sizes of a slot, row and tier come from the terminal's yard geometry (company settings) with each snapshot.
+const DEFAULT_GEOMETRY = { slot: 6.4, row: 3.2, tier: 2.7, block_gap: 16, car_bay: 2.5, truck_bay: 4 }
+// Level of detail: containers nearer than NEAR_DIST (at most MAX_NEAR of them) are drawn with ribs, door rods and name labels.
+// Everything further away is a plain box, so thousands of containers stay smooth.
+const NEAR_DIST = 90
+const MAX_NEAR = 120
+const UP = new THREE.Vector3(0, 1, 0)
 const PALETTE = ['#2563EB', '#0EA5E9', '#14B8A6', '#F97316', '#8B5CF6', '#EC4899', '#84CC16', '#EAB308']
 
 export interface Snapshot {
@@ -15,13 +19,14 @@ export interface Snapshot {
   stacks: any[]
   containers: any[]
   lines: any[]
+  layout?: YardLayout | null
 }
 export interface Filter {
   line?: string | null
   holdsOnly?: boolean
   cargo?: 'Full' | 'Empty' | null
 }
-interface Pos { x: number; y: number; z: number; len: number }
+interface Pos { x: number; y: number; z: number; len: number; yaw: number }
 
 const THEMES = {
   light: { bg: '#EEF2F7', ground: '#E2E8F0', slab: '#F8FAFC', grid: '#CBD5E1', text: '#334155', faded: '#CBD5E1', hold: '#DC2626', flash: '#F59E0B', sun: 2.2, hemi: 1.1 },
@@ -34,7 +39,17 @@ export class YardScene {
   private camera: THREE.PerspectiveCamera
   private controls: OrbitControls
   private ground = new THREE.Group()
-  private mesh: THREE.InstancedMesh | null = null
+  private mesh: THREE.InstancedMesh | null = null // invisible: one box per container, used for picking
+  private far: THREE.InstancedMesh | null = null // visible plain boxes for distant containers
+  private near20: THREE.InstancedMesh
+  private near40: THREE.InstancedMesh
+  private decals: THREE.Mesh[] = []
+  private decalSlot: number[] = []
+  private decalMat: THREE.MeshStandardMaterial
+  private atlas = new LabelAtlas()
+  private lodTimer: ReturnType<typeof setTimeout> | null = null
+  private items: { name: string; x: number; y: number; z: number; len: number; yaw: number; flip: boolean }[] = []
+  private byName = new Map<string, any>()
   private capacity = 0
   private outline: THREE.LineSegments
   private sun: THREE.DirectionalLight
@@ -44,11 +59,13 @@ export class YardScene {
   private ro: ResizeObserver
   private theme: 'light' | 'dark' = 'light'
 
-  private snap: Snapshot = { blocks: [], stacks: [], containers: [], lines: [] }
+  private snap: Snapshot = { blocks: [], stacks: [], containers: [], lines: [], layout: null }
+  private g = DEFAULT_GEOMETRY
+  private layoutGroup = new THREE.Group()
   private filter: Filter = {}
   private layoutKey = ''
   private stackInfo = new Map<string, { block: string; bay: number; row: number }>()
-  private origin = new Map<string, { x: number; z: number; w: number; d: number }>()
+  private origin = new Map<string, { cx: number; cz: number; w: number; d: number; rot: number; flip: boolean }>()
   private index: string[] = []
   private pos = new Map<string, Pos>()
   private prevKey = new Map<string, string>()
@@ -77,14 +94,29 @@ export class YardScene {
     this.controls.maxPolarAngle = Math.PI / 2.05
     this.controls.minDistance = 8
     this.controls.maxDistance = 900
-    this.controls.addEventListener('change', () => this.render())
+    this.controls.addEventListener('change', () => { this.render(); this.scheduleLod() })
+
+    const bodyMat = buildContainerMaterial()
+    this.near20 = new THREE.InstancedMesh(buildContainerGeometry(REAL.l20), bodyMat, MAX_NEAR)
+    this.near40 = new THREE.InstancedMesh(buildContainerGeometry(REAL.l40), bodyMat, MAX_NEAR)
+    for (const m of [this.near20, this.near40]) {
+      m.castShadow = true
+      m.receiveShadow = true
+      m.count = 0
+      m.frustumCulled = false
+      this.scene.add(m)
+    }
+    this.decalMat = new THREE.MeshStandardMaterial({
+      map: this.atlas.texture, transparent: true, alphaTest: 0.03, depthWrite: false, roughness: 0.6, metalness: 0,
+      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+    })
 
     this.hemi = new THREE.HemisphereLight('#ffffff', '#94a3b8', 1)
     this.sun = new THREE.DirectionalLight('#ffffff', 2)
     this.sun.position.set(-120, 220, 90)
     this.sun.castShadow = true
     this.sun.shadow.mapSize.set(2048, 2048)
-    this.scene.add(this.hemi, this.sun, this.sun.target, this.ground)
+    this.scene.add(this.hemi, this.sun, this.sun.target, this.ground, this.layoutGroup)
 
     this.outline = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1)), new THREE.LineBasicMaterial({ color: '#F59E0B' }))
     this.outline.visible = false
@@ -117,14 +149,14 @@ export class YardScene {
   setData(snap: Snapshot, filter: Filter = this.filter) {
     this.snap = snap
     this.filter = filter
-    const key = snap.blocks.map((b) => `${b.name}:${b.bay_count}x${b.row_count}`).join('|') + '#' + snap.stacks.length
+    const key = JSON.stringify(snap.layout || null) + '#' + snap.blocks.map((b) => `${b.name}:${b.bay_count}x${b.row_count}`).join('|') + '#' + snap.stacks.length
     if (key !== this.layoutKey) {
       this.layoutKey = key
       this.computeLayout()
       this.buildGround()
     }
     this.buildInstances()
-    if (!this.fitted && snap.blocks.length) { this.fit(); this.fitted = true }
+    if (!this.fitted && (snap.blocks.length || snap.layout?.items.length)) { this.fit(); this.fitted = true }
     this.updateOutline()
     this.render()
   }
@@ -153,8 +185,7 @@ export class YardScene {
   }
 
   fit() {
-    const box = new THREE.Box3()
-    for (const o of this.origin.values()) { box.expandByPoint(new THREE.Vector3(o.x, 0, o.z)); box.expandByPoint(new THREE.Vector3(o.x + o.w, 0, o.z + o.d)) }
+    const box = layoutBounds(this.snap.layout?.items || [])
     if (box.isEmpty()) return
     const c = box.getCenter(new THREE.Vector3())
     const size = box.getSize(new THREE.Vector3())
@@ -181,8 +212,16 @@ export class YardScene {
     dom.removeEventListener('pointermove', this.onMove)
     this.controls.dispose()
     this.clearGroup(this.ground)
+    this.clearGroup(this.layoutGroup)
+    if (this.lodTimer) clearTimeout(this.lodTimer)
     this.mesh?.geometry.dispose()
     ;(this.mesh?.material as THREE.Material | undefined)?.dispose()
+    this.far?.geometry.dispose()
+    ;(this.far?.material as THREE.Material | undefined)?.dispose()
+    for (const m of [this.near20, this.near40]) { m.geometry.dispose(); (m.material as THREE.Material).dispose() }
+    for (const d of this.decals) d.geometry.dispose()
+    this.decalMat.dispose()
+    this.atlas.dispose()
     this.renderer.dispose()
     this.renderer.forceContextLoss()
     dom.remove()
@@ -192,36 +231,27 @@ export class YardScene {
   private computeLayout() {
     this.origin.clear()
     this.stackInfo.clear()
-    const blocks = [...this.snap.blocks].sort((a, b) => String(a.block_code).localeCompare(String(b.block_code)))
-    let z = 0
-    let rowDepth = 0
-    blocks.forEach((b, i) => {
-      const col = i % COLUMNS
-      if (col === 0 && i > 0) { z += rowDepth + BLOCK_GAP; rowDepth = 0 }
-      const w = b.bay_count * SLOT
-      const d = b.row_count * ROW
-      this.origin.set(b.name, { x: this.colStart(blocks, col), z, w, d })
-      rowDepth = Math.max(rowDepth, d)
-    })
-    for (const s of this.snap.stacks) this.stackInfo.set(s.name, { block: s.yard_block, bay: s.bay, row: s.row_no })
-  }
-  private colStart(blocks: any[], col: number) {
-    // x offset of a column = widest block in earlier columns + gap
-    let x = 0
-    for (let c = 0; c < col; c++) {
-      const w = Math.max(0, ...blocks.filter((_, i) => i % COLUMNS === c).map((b) => b.bay_count * SLOT))
-      x += w + BLOCK_GAP
+    const lay = this.snap.layout
+    this.g = lay?.geometry || DEFAULT_GEOMETRY
+    for (const it of lay?.items || []) {
+      if (it.item_type !== 'Block' || !it.yard_block) continue
+      const b = this.snap.blocks.find((x) => x.name === it.yard_block)
+      if (!b) continue
+      this.origin.set(it.yard_block, {
+        cx: it.x || 0, cz: it.z || 0, w: b.bay_count * this.g.slot, d: b.row_count * this.g.row,
+        rot: ((it.rotation || 0) * Math.PI) / 180, flip: it.door_side !== 'Higher bay end',
+      })
     }
-    return x
+    for (const s of this.snap.stacks) if (this.origin.has(s.yard_block)) this.stackInfo.set(s.name, { block: s.yard_block, bay: s.bay, row: s.row_no })
   }
 
-  private slotX(block: string, bay: number) {
+  /** Site position of the centre of a bay/row slot, turning the block's local grid by its rotation. */
+  private slot(block: string, bay: number, row: number) {
     const o = this.origin.get(block)!
-    return o.x + (bay - 0.5) * SLOT
-  }
-  private slotZ(block: string, row: number) {
-    const o = this.origin.get(block)!
-    return o.z + (row - 0.5) * ROW
+    const lx = (bay - 0.5) * this.g.slot - o.w / 2
+    const lz = (row - 0.5) * this.g.row - o.d / 2
+    const c = Math.cos(o.rot), s = Math.sin(o.rot)
+    return { x: o.cx + lx * c - lz * s, z: o.cz + lx * s + lz * c }
   }
 
   // ---------- ground ----------
@@ -237,26 +267,34 @@ export class YardScene {
 
   private buildGround() {
     this.clearGroup(this.ground)
+    this.clearGroup(this.layoutGroup)
     const c = THEMES[this.theme]
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: c.ground, roughness: 1 }))
+    const base = this.snap.layout?.base_surface
+    const baseColour = base && base !== 'Default' ? surfaceColour(base, this.theme) : c.ground
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: baseColour, roughness: 1 }))
     plane.rotation.x = -Math.PI / 2
     plane.position.y = -0.06
     plane.receiveShadow = true
     this.ground.add(plane)
+    if (this.snap.layout) this.layoutGroup.add(buildLayoutItems(this.snap.layout, this.theme, c.text))
     for (const b of this.snap.blocks) {
       const o = this.origin.get(b.name)
       if (!o) continue
+      const grp = new THREE.Group()
+      grp.position.set(o.cx, 0, o.cz)
+      grp.rotation.y = -o.rot
       const slab = new THREE.Mesh(new THREE.BoxGeometry(o.w + 2, 0.2, o.d + 2), new THREE.MeshStandardMaterial({ color: c.slab, roughness: 0.95 }))
-      slab.position.set(o.x + o.w / 2, -0.1, o.z + o.d / 2)
+      slab.position.set(0, -0.1, 0)
       slab.receiveShadow = true
-      this.ground.add(slab)
+      grp.add(slab)
       const pts: number[] = []
-      for (let i = 0; i <= b.bay_count; i++) pts.push(o.x + i * SLOT, 0.02, o.z, o.x + i * SLOT, 0.02, o.z + o.d)
-      for (let r = 0; r <= b.row_count; r++) pts.push(o.x, 0.02, o.z + r * ROW, o.x + o.w, 0.02, o.z + r * ROW)
+      for (let i = 0; i <= b.bay_count; i++) pts.push(-o.w / 2 + i * this.g.slot, 0.02, -o.d / 2, -o.w / 2 + i * this.g.slot, 0.02, o.d / 2)
+      for (let r = 0; r <= b.row_count; r++) pts.push(-o.w / 2, 0.02, -o.d / 2 + r * this.g.row, o.w / 2, 0.02, -o.d / 2 + r * this.g.row)
       const g = new THREE.BufferGeometry()
       g.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3))
-      this.ground.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: c.grid })))
-      this.ground.add(this.label(`Block ${b.block_code}`, o.x + o.w / 2, o.z - 5, c.text))
+      grp.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: c.grid })))
+      grp.add(this.label(`Block ${b.block_code}`, 0, -o.d / 2 - 5, c.text))
+      this.ground.add(grp)
     }
   }
 
@@ -289,34 +327,44 @@ export class YardScene {
     const list = this.snap.containers.filter((c) => c.yard_stack && this.stackInfo.has(c.yard_stack))
     if (!this.mesh || list.length > this.capacity) {
       if (this.mesh) { this.scene.remove(this.mesh); this.mesh.geometry.dispose(); (this.mesh.material as THREE.Material).dispose() }
+      if (this.far) { this.scene.remove(this.far); this.far.geometry.dispose(); (this.far.material as THREE.Material).dispose() }
       this.capacity = Math.max(512, Math.ceil(list.length * 1.5))
-      const mat = new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.1 })
-      this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), mat, this.capacity)
-      this.mesh.castShadow = true
-      this.mesh.receiveShadow = true
-      this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * 3), 3)
+      this.mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial(), this.capacity)
+      this.mesh.visible = false // raycasting still works on an invisible mesh
       this.scene.add(this.mesh)
+      this.far = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshStandardMaterial({ roughness: 0.55, metalness: 0.1 }), this.capacity)
+      this.far.castShadow = true
+      this.far.receiveShadow = true
+      this.far.frustumCulled = false
+      this.far.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * 3), 3)
+      this.scene.add(this.far)
     }
     const m = new THREE.Matrix4()
     const q = new THREE.Quaternion()
     this.index = []
+    this.items = []
     this.pos.clear()
+    this.byName = new Map(this.snap.containers.map((c) => [c.name, c]))
     const first = this.prevKey.size === 0
     const now = performance.now()
     const nextKey = new Map<string, string>()
     list.forEach((c, i) => {
       const a = this.stackInfo.get(c.yard_stack)!
-      let x = this.slotX(a.block, a.bay)
-      let len = Number(c.length_ft) >= 40 ? SLOT * 2 - 0.5 : SLOT - 0.5
+      const o = this.origin.get(a.block)!
+      const sa = this.slot(a.block, a.bay, a.row)
+      let x = sa.x, z = sa.z
+      let len = Number(c.length_ft) >= 40 ? this.g.slot * 2 - 0.5 : this.g.slot - 0.5
       const b = c.partner_stack ? this.stackInfo.get(c.partner_stack) : null
-      if (b) { x = (x + this.slotX(b.block, b.bay)) / 2; len = SLOT * 2 - 0.5 }
-      const z = this.slotZ(a.block, a.row)
+      if (b) { const sb = this.slot(b.block, b.bay, b.row); x = (x + sb.x) / 2; z = (z + sb.z) / 2; len = this.g.slot * 2 - 0.5 }
       const tier = Math.max(1, Number(c.tier) || 1)
-      const y = (tier - 0.5) * TIER_H + 0.0
-      m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(len, TIER_H - 0.12, WIDTH))
+      const y = (tier - 1) * this.g.tier + REAL.h / 2
+      const yaw = -o.rot
+      q.setFromAxisAngle(UP, yaw)
+      m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(len, REAL.h, WIDTH))
       this.mesh!.setMatrixAt(i, m)
       this.index.push(c.name)
-      this.pos.set(c.name, { x, y, z, len })
+      this.items.push({ name: c.name, x, y, z, len, yaw, flip: o.flip })
+      this.pos.set(c.name, { x, y, z, len, yaw })
       const k = `${c.yard_stack}/${c.tier}`
       nextKey.set(c.name, k)
       if (!first && this.prevKey.get(c.name) !== k) this.flashUntil.set(c.name, now + 3500)
@@ -325,30 +373,125 @@ export class YardScene {
     this.mesh.count = list.length
     this.mesh.instanceMatrix.needsUpdate = true
     this.mesh.computeBoundingSphere()
-    this.paint()
+    this.lod()
     this.startFlashLoop()
   }
 
-  private paint() {
-    if (!this.mesh) return
+  /** The colour a container shows right now: its line, then empty / hold / filter / just-moved tints. */
+  private colourOf(name: string) {
     const t = THEMES[this.theme]
     const f = this.filter
-    const faded = new THREE.Color(t.faded)
-    const hold = new THREE.Color(t.hold)
-    const flash = new THREE.Color(t.flash)
-    const now = performance.now()
-    const byName = new Map(this.snap.containers.map((c) => [c.name, c]))
-    this.index.forEach((name, i) => {
-      const c = byName.get(name)!
-      const col = this.lineColour(c.shipping_line)
-      if (c.cargo_status === 'Empty') col.lerp(new THREE.Color('#ffffff'), 0.4)
-      if (c.is_on_hold) col.lerp(hold, 0.65)
-      const match = (!f.line || c.shipping_line === f.line) && (!f.holdsOnly || c.is_on_hold) && (!f.cargo || c.cargo_status === f.cargo)
-      if (!match) col.copy(faded)
-      if ((this.flashUntil.get(name) || 0) > now) col.lerp(flash, 0.75)
-      this.mesh!.setColorAt(i, col)
+    const c = this.byName.get(name)
+    const col = this.lineColour(c.shipping_line)
+    if (c.cargo_status === 'Empty') col.lerp(new THREE.Color('#ffffff'), 0.4)
+    if (c.is_on_hold) col.lerp(new THREE.Color(t.hold), 0.65)
+    const match = (!f.line || c.shipping_line === f.line) && (!f.holdsOnly || c.is_on_hold) && (!f.cargo || c.cargo_status === f.cargo)
+    if (!match) col.copy(new THREE.Color(t.faded))
+    if ((this.flashUntil.get(name) || 0) > performance.now()) col.lerp(new THREE.Color(t.flash), 0.75)
+    return col
+  }
+
+  private scheduleLod() {
+    if (this.lodTimer) return
+    this.lodTimer = setTimeout(() => { this.lodTimer = null; this.lod(); this.render() }, 120)
+  }
+
+  private decal(i: number) {
+    let d = this.decals[i]
+    if (!d) {
+      d = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.decalMat)
+      d.matrixAutoUpdate = false
+      d.frustumCulled = false
+      this.scene.add(d)
+      this.decals[i] = d
+      this.decalSlot[i] = -1
+    }
+    return d
+  }
+
+  /** Decides which containers are close enough for full detail and writes every instance's position and colour. */
+  private lod() {
+    if (!this.far || !this.mesh) return
+    const cam = this.camera.position
+    const nearIdx: { i: number; d: number }[] = []
+    this.items.forEach((it, i) => {
+      const d = Math.hypot(it.x - cam.x, it.y - cam.y, it.z - cam.z)
+      if (d < NEAR_DIST) nearIdx.push({ i, d })
     })
-    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true
+    nearIdx.sort((a, b) => a.d - b.d)
+    const near = new Set(nearIdx.slice(0, MAX_NEAR).map((n) => n.i))
+
+    const m = new THREE.Matrix4()
+    const q = new THREE.Quaternion()
+    const flip = new THREE.Quaternion()
+    const sideBack = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI)
+    const none = new THREE.Quaternion()
+    const one = new THREE.Vector3(1, 1, 1)
+    let nFar = 0, n20 = 0, n40 = 0, nDecal = 0
+    this.atlas.beginFrame()
+
+    this.items.forEach((it, i) => {
+      const col = this.colourOf(it.name)
+      q.setFromAxisAngle(UP, it.yaw)
+      flip.setFromAxisAngle(UP, it.yaw + (it.flip ? Math.PI : 0))
+      if (!near.has(i)) {
+        m.compose(new THREE.Vector3(it.x, it.y, it.z), q, new THREE.Vector3(it.len, REAL.h, WIDTH))
+        this.far!.setMatrixAt(nFar, m)
+        this.far!.setColorAt(nFar, col)
+        nFar++
+        return
+      }
+      const is40 = it.len > this.g.slot
+      const mesh = is40 ? this.near40 : this.near20
+      const k = is40 ? n40++ : n20++
+      m.compose(new THREE.Vector3(it.x, it.y, it.z), flip, new THREE.Vector3(it.len / (is40 ? REAL.l40 : REAL.l20), 1, 1))
+      mesh.setMatrixAt(k, m)
+      mesh.setColorAt(k, col)
+
+      // name and number on both long sides
+      const c = this.byName.get(it.name)
+      const line = this.snap.lines.find((l) => l.name === c.shipping_line)
+      const lum = 0.2126 * col.r + 0.7152 * col.g + 0.0722 * col.b
+      const slot = this.atlas.ensure(it.name, line?.line_name || c.shipping_line || '', lum > 0.3 ? '#111827' : '#FFFFFF')
+      if (slot < 0) return
+      const w = Math.min(it.len * 0.55, 5.4)
+      const mc = new THREE.Matrix4().compose(new THREE.Vector3(it.x, it.y, it.z), flip, one)
+      for (const side of [1, -1]) {
+        const ml = new THREE.Matrix4().compose(
+          new THREE.Vector3(-it.len * 0.12, 0.22, side * (REAL.w / 2 + 0.012)),
+          side === 1 ? none : sideBack,
+          new THREE.Vector3(w, w / 4, 1),
+        )
+        const d = this.decal(nDecal)
+        d.matrix.copy(mc).multiply(ml)
+        d.matrixWorld.copy(d.matrix)
+        d.visible = true
+        if (this.decalSlot[nDecal] !== slot) {
+          const r = this.atlas.uv(slot)
+          const uv = (d.geometry as THREE.PlaneGeometry).getAttribute('uv') as THREE.BufferAttribute
+          uv.setXY(0, r.u0, r.v0 + r.dv)
+          uv.setXY(1, r.u0 + r.du, r.v0 + r.dv)
+          uv.setXY(2, r.u0, r.v0)
+          uv.setXY(3, r.u0 + r.du, r.v0)
+          uv.needsUpdate = true
+          this.decalSlot[nDecal] = slot
+        }
+        nDecal++
+      }
+    })
+    for (let i = nDecal; i < this.decals.length; i++) this.decals[i].visible = false
+    this.far.count = nFar
+    this.near20.count = n20
+    this.near40.count = n40
+    for (const mesh of [this.far, this.near20, this.near40]) {
+      mesh.instanceMatrix.needsUpdate = true
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true
+    }
+    this.atlas.flush()
+  }
+
+  private paint() {
+    this.lod()
   }
 
   private startFlashLoop() {
@@ -367,7 +510,8 @@ export class YardScene {
     this.outline.visible = !!p
     if (p) {
       this.outline.position.set(p.x, p.y, p.z)
-      this.outline.scale.set(p.len + 0.3, TIER_H - 0.05, WIDTH + 0.3)
+      this.outline.rotation.y = p.yaw
+      this.outline.scale.set(p.len + 0.3, REAL.h + 0.1, WIDTH + 0.3)
     }
   }
 

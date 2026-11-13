@@ -6,6 +6,7 @@ export const router = createRouter({
   routes: [
     { path: '/', name: 'dashboard', component: () => import('./pages/Dashboard.vue'), meta: { title: 'Dashboard' } },
     { path: '/yard', name: 'yard', component: () => import('./pages/Yard.vue'), meta: { title: '3D Yard' } },
+    { path: '/yard-designer', name: 'yard-designer', component: () => import('./pages/YardDesigner.vue'), meta: { title: 'Yard Designer' } },
     { path: '/gate', name: 'gate', component: () => import('./pages/Gate.vue'), meta: { title: 'Gate' } },
     { path: '/appointments', name: 'appointments', component: () => import('./pages/Appointments.vue'), meta: { title: 'Appointments' } },
     { path: '/ops', name: 'ops', component: () => import('./pages/Ops.vue'), meta: { title: 'My moves', bare: true } },

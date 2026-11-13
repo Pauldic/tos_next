@@ -15,8 +15,12 @@ TERMINAL_OVERRIDES = {
 
 
 def company(key):
-    """The company-wide value. A Single that was never saved still returns the field defaults from the DocType."""
-    return frappe.get_cached_doc("TOS Settings").get(key)
+    """The company-wide value. If the page was saved before a field existed, the default set on the DocType field is used."""
+    value = frappe.get_cached_doc("TOS Settings").get(key)
+    if value is None:
+        field = frappe.get_meta("TOS Settings").get_field(key)
+        value = field.default if field else None
+    return value
 
 
 def get(key, terminal=None):

@@ -50,21 +50,21 @@ def gate_action(transaction, action, **args):
 
 @frappe.whitelist()
 def start_visit(lane, carrier, truck, driver, move_type, appointment=None, override=None,
-                container=None, container_no=None, container_type=None, booking_ref=None, seal_no=None, gross_weight_kg=None):
+                container=None, container_no=None, container_type=None, shipping_line=None, booking_ref=None, seal_no=None, gross_weight_kg=None):
     # A container typed at the gate that is not in the system yet is a NEW container: it needs a number and a type.
     if container and not frappe.db.exists("Container", container):
         container_no, container = container, None
     doc = frappe.get_doc({
         "doctype": "Gate Transaction", "lane": lane, "carrier": carrier, "truck": truck, "driver": driver,
         "move_type": move_type, "appointment": appointment or None, "override": override or None,
-        "container": container or None, "container_no": container_no or None, "container_type": container_type or None, "booking_ref": booking_ref or None,
+        "container": container or None, "container_no": container_no or None, "container_type": container_type or None, "shipping_line": shipping_line or None, "booking_ref": booking_ref or None,
         "seal_no": seal_no or None, "gross_weight_kg": gross_weight_kg or None,
     }).insert()
     return _tx(doc)
 
 
 @frappe.whitelist()
-def set_container_details(transaction, container_no=None, container_type=None):
+def set_container_details(transaction, container_no=None, container_type=None, shipping_line=None):
     """Fill in the number and type of a NEW container on a Gate In visit that is already under way."""
     gt = frappe.get_doc("Gate Transaction", transaction)
     gt.check_permission("write")
@@ -80,11 +80,20 @@ def set_container_details(transaction, container_no=None, container_type=None):
         gt.container_type = container_type
     if container_no:
         gt.container_no = container_no
+    if shipping_line:
+        if not frappe.db.exists("Shipping Line", shipping_line):
+            frappe.throw(_("Unknown shipping line {0}.").format(shipping_line))
+        gt.shipping_line = shipping_line
     if not (gt.container_no and gt.container_type):
         frappe.throw(_("Give both the container number and the container type."))
     gt.save()
     gt.add_comment("Info", _("Container details set by {0}: {1} ({2})").format(frappe.session.user, gt.container_no, gt.container_type))
     return _tx(frappe.get_doc("Gate Transaction", transaction))
+
+
+@frappe.whitelist()
+def shipping_lines():
+    return frappe.get_list("Shipping Line", filters={"is_active": 1}, fields=["name", "line_name"], order_by="line_name", limit_page_length=0)
 
 
 @frappe.whitelist()

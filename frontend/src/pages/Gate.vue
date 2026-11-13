@@ -17,6 +17,7 @@ const overrides = ref<any[]>([])
 const error = ref('')
 const scanning = ref(false)
 const ctypes = ref<any[]>([])
+const lines = ref<any[]>([])
 
 async function refresh() {
   try {
@@ -69,25 +70,29 @@ async function submitPrompt() {
 }
 
 // ---- container details for a new container on a visit already under way ----
-const cd = reactive({ open: false, tx: null as any, no: '', type: '', error: '', loading: false })
+const cd = reactive({ open: false, tx: null as any, no: '', type: '', line: '', error: '', loading: false })
 async function askContainer(tx: any) {
-  if (!ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
-  Object.assign(cd, { open: true, tx, no: tx.container || '', type: '', error: '', loading: false })
+  await loadChoices()
+  Object.assign(cd, { open: true, tx, no: tx.container || '', type: '', line: '', error: '', loading: false })
 }
 async function submitContainer() {
   cd.loading = true; cd.error = ''
   try {
-    await act('set_container_details', { transaction: cd.tx.name, container_no: cd.no, container_type: cd.type })
+    await act('set_container_details', { transaction: cd.tx.name, container_no: cd.no, container_type: cd.type, shipping_line: cd.line })
     cd.open = false
     await refresh()
   } catch (e: any) { cd.error = e.message } finally { cd.loading = false }
 }
 
 // ---- start a visit ----
-const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', container: '', container_type: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
+const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', container: '', container_type: '', shipping_line: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
 const moves = (dir: string) => (dir === 'In' ? ['Export Drop', 'Empty Return'] : ['Import Pickup', 'Empty Pickup'])
-async function startVisit(lane: any) {
+async function loadChoices() {
   if (!ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
+  if (!lines.value.length) { try { lines.value = (await gateApi('shipping_lines')) as any[] } catch {} }
+}
+async function startVisit(lane: any) {
+  await loadChoices()
   Object.assign(visit, { open: true, lane, appointment: '', carrier: '', truck: '', driver: '', move_type: moves(lane.direction)[0], container: '', container_type: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
 }
 const queueFor = computed(() => queue.value.filter((a) => visit.lane && moves(visit.lane.direction).includes(a.move_type)))
@@ -104,7 +109,7 @@ async function submitVisit() {
   try {
     await act('start_visit', {
       lane: visit.lane.name, carrier: visit.carrier, truck: visit.truck, driver: visit.driver, move_type: visit.move_type,
-      appointment: visit.appointment, override: visit.override, container: visit.container, container_type: visit.container_type, booking_ref: visit.booking_ref, seal_no: visit.seal_no,
+      appointment: visit.appointment, override: visit.override, container: visit.container, container_type: visit.container_type, shipping_line: visit.shipping_line, booking_ref: visit.booking_ref, seal_no: visit.seal_no,
     })
     visit.open = false
     await refresh()
@@ -201,6 +206,7 @@ const time = (t?: string) => (t || '').slice(0, 5)
 
   <Modal :open="cd.open" title="Container details" confirm-label="Save" :loading="cd.loading" :error="cd.error" @close="cd.open = false" @confirm="submitContainer">
     <Field label="Container number"><input v-model="cd.no" class="tos-input font-mono" autocomplete="off" /></Field>
+    <Field label="Shipping line" hint="Its name is printed on the container in the 3D yard."><select v-model="cd.line" class="tos-input"><option value="">None / not known</option><option v-for="l in lines" :key="l.name" :value="l.name">{{ l.line_name }}</option></select></Field>
     <Field label="Container type" hint="Needed because this container is new to the system."><select v-model="cd.type" class="tos-input"><option value="">Choose…</option><option v-for="t in ctypes" :key="t.name" :value="t.name">{{ t.name }} · {{ t.length_ft }} ft<template v-if="t.description"> · {{ t.description }}</template></option></select></Field>
   </Modal>
 
@@ -215,6 +221,7 @@ const time = (t?: string) => (t || '').slice(0, 5)
     <div class="grid grid-cols-2 gap-3">
       <Field label="Move"><select v-model="visit.move_type" class="tos-input"><option v-for="m in moves(visit.lane?.direction || 'In')" :key="m" :value="m">{{ m }}</option></select></Field>
       <Field label="Container" :hint="visit.lane?.direction === 'In' ? 'Pick one already in the system, or type a new number.' : undefined"><ContainerPick v-model="visit.container" /></Field>
+      <Field v-if="visit.lane?.direction === 'In' && visit.container" label="Shipping line (new containers only)" hint="Its name is printed on the container in the 3D yard."><select v-model="visit.shipping_line" class="tos-input"><option value="">None / not known</option><option v-for="l in lines" :key="l.name" :value="l.name">{{ l.line_name }}</option></select></Field>
       <Field v-if="visit.lane?.direction === 'In' && visit.container" label="Container type (new containers only)" hint="Needed when the number is not in the system yet.">
         <select v-model="visit.container_type" class="tos-input"><option value="">Choose…</option><option v-for="t in ctypes" :key="t.name" :value="t.name">{{ t.name }} · {{ t.length_ft }} ft<template v-if="t.description"> · {{ t.description }}</template></option></select>
       </Field>

@@ -25,6 +25,7 @@ const companyName: string = (window as any).company_name || ''
 const nav = [
   { label: 'Dashboard', to: '/', icon: 'lucide-layout-dashboard' },
   { label: '3D Yard', to: '/yard', icon: 'lucide-boxes' },
+  { label: 'Yard Designer', to: '/yard-designer', icon: 'lucide-pencil-ruler' },
   { label: 'Gate', to: '/gate', icon: 'lucide-door-open' },
   { label: 'Appointments', to: '/appointments', icon: 'lucide-calendar-clock' },
   { label: 'My Moves', to: '/ops', icon: 'lucide-forklift' },

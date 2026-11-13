@@ -88,9 +88,9 @@ class GateTransaction(Document):
             c = frappe.get_doc("Container", self.container)
             if self.direction == "Out":
                 if c.status != "On Terminal":
-                    frappe.throw(_("{0} is not on the terminal.").format(c.name))
+                    frappe.throw(_("{0} is not on the terminal, so it cannot leave. Check the container number.").format(c.name))
                 if c.is_on_hold:
-                    frappe.throw(_("{0} is on hold. A supervisor must release the hold first.").format(c.name))
+                    frappe.throw(_("{0} is on hold (see the Container Hold list). A supervisor must release the hold first.").format(c.name))
             self.container_type = self.container_type or c.container_type
             if not frappe.get_doc("Truck", self.truck).can_carry(c.length_ft or 40):
                 frappe.throw(_("Truck {0} cannot carry a {1} ft container.").format(self.truck, c.length_ft))
@@ -135,7 +135,7 @@ class GateTransaction(Document):
             if self.direction == "Out" and not self.container:
                 frappe.throw(_("Choose the container before this step."))
             if self.direction == "In" and not (self.container or self.container_no):
-                frappe.throw(_("Enter or scan the container number first."))
+                frappe.throw(_("The container number is missing. Press Portal read on the lane card and enter it, then Advance again."))
             if self.ocr_container_no:
                 expected = self.container or self.container_no
                 if expected and normalise_no(self.ocr_container_no) != normalise_no(expected):
@@ -146,7 +146,7 @@ class GateTransaction(Document):
             frappe.throw(_("The seal is not intact. Fail the step or ask a supervisor to waive it."))
         if step in ("Damage Scan", "Admitted") and self.direction == "In":
             if not self.container and not (self.container_no and self.container_type):
-                frappe.throw(_("A new container needs its number and type before it can be admitted."))
+                frappe.throw(_("A new container needs its number and its type before it can be admitted. Press Container details on the lane card to add them."))
 
     # ---------- actions ----------
     @frappe.whitelist()
@@ -297,10 +297,10 @@ class GateTransaction(Document):
         if self.container:
             c = frappe.get_doc("Container", self.container)
             if c.status == "On Terminal":
-                frappe.throw(_("{0} is already on the terminal.").format(c.name))
+                frappe.throw(_("{0} is already on the terminal, so it cannot be admitted again. For a Gate In, give a container that is not in the yard yet, or type a new number.").format(c.name))
         else:
             if not (self.container_no and self.container_type):
-                frappe.throw(_("A new container needs its number and type."))
+                frappe.throw(_("A new container needs its number and its type. Press Container details on the lane card to add them."))
             c = frappe.get_doc({
                 "doctype": "Container", "container_no": self.container_no, "terminal": self.terminal,
                 "container_type": self.container_type, "shipping_line": self.shipping_line,

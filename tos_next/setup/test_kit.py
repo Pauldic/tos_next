@@ -133,6 +133,10 @@ def _next_n():
 def refresh_today():
     """Cancel unused test appointments and book a fresh set around the current hour."""
     frappe.set_user("Administrator")
+    # free any lane left busy by an unfinished test visit
+    for v in frappe.get_all("Gate Transaction", filters={"booking_ref": ["like", "TESTKIT-%"], "status": ["in", ["Processing", "On Hold", "Cleared"]]}, fields=["name", "lane"]):
+        frappe.db.set_value("Gate Transaction", v.name, "status", "Rejected")
+        frappe.db.set_value("Gate Lane", v.lane, {"status": "Open", "current_transaction": None})
     # retire the previous set
     for a in frappe.get_all("Appointment", filters={"booking_ref": ["like", "TESTKIT-%"], "status": ["in", ["Booked", "Late"]]}, pluck="name"):
         doc = frappe.get_doc("Appointment", a)

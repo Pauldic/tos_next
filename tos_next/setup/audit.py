@@ -71,7 +71,8 @@ def run():
         r.add(not is_scheduler_disabled(), "Scheduler is enabled (late and no-show marking, override expiry)")
     except Exception:
         r.add(False, "Scheduler state could not be read", warn=True)
-    r.add(not frappe.conf.get("developer_mode"), "Developer mode is off", warn=True)
+    dev = bool(frappe.conf.get("developer_mode"))
+    r.add(not dev, "Developer mode is off" if not dev else "Developer mode is ON (fine for testing; turn it off before go-live)", warn=True)
     r.add(True, "Realtime port", str(frappe.conf.get("socketio_port") or "default 9000"))
     term = frappe.get_all("Terminal", filters={"is_active": 1}, pluck="name")
     r.add(bool(term), "An active terminal exists", ", ".join(term))
@@ -85,8 +86,8 @@ def run():
         r.add(bool(frappe.db.count("Equipment", {"terminal": t})), "Equipment exists", warn=True)
         ahead = frappe.db.count("Slot Capacity", {"terminal": t, "slot_date": ["between", [nowdate(), add_days(nowdate(), 7)]]})
         r.add(ahead > 0, "Appointment slots exist for the next 7 days", f"{ahead} slots; Slot Template -> Generate Slots")
-    demo = frappe.db.count("Container", {"name": ["like", "DEMO%"]})
-    r.add(not demo, "No demo containers on this site", f"{demo} found", warn=True)
+    demo = frappe.db.count("Truck", {"plate_no": ["like", "DEMO%"]})
+    r.add(not demo, "No demo trucks on this site" if not demo else f"Demo data is present ({demo} DEMO trucks): remove it before go-live", warn=True)
 
     # --- the carrier boundary, proven by trying to break it ---
     boundary_test(r)

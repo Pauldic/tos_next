@@ -17,6 +17,8 @@ const lane = ref('')
 const override = ref('')
 const newNo = ref('')
 const newType = ref('')
+const newLine = ref('')
+const lines = ref<any[]>([])
 const ctypes = ref<any[]>([])
 const input = ref<HTMLInputElement>()
 
@@ -27,7 +29,7 @@ let stream: MediaStream | null = null
 let timer = 0
 
 function reset() {
-  code.value = ''; result.value = null; error.value = ''; lane.value = ''; override.value = ''; newNo.value = ''; newType.value = ''; stopCam(); camError.value = ''
+  code.value = ''; result.value = null; error.value = ''; lane.value = ''; override.value = ''; newNo.value = ''; newType.value = ''; newLine.value = ''; stopCam(); camError.value = ''
 }
 watch(() => props.open, async (o) => { if (o) { reset(); await nextTick(); input.value?.focus() } else stopCam() })
 onBeforeUnmount(stopCam)
@@ -38,7 +40,7 @@ async function lookup(text = code.value) {
   try {
     result.value = await gateApi('scan_pass', { code: text, terminal: props.terminal })
     lane.value = openLanes.value[0]?.name || ''
-    if (result.value.direction === 'In' && !result.value.container && !ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
+    if (result.value.direction === 'In' && !result.value.container && !ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[]; lines.value = (await gateApi('shipping_lines')) as any[] } catch {} }
     override.value = matching.value[0]?.name || ''
   } catch (e: any) {
     error.value = e.message
@@ -58,7 +60,7 @@ async function start() {
   const r = result.value
   starting.value = true; error.value = ''
   try {
-    await act('start_visit', { lane: lane.value, carrier: r.carrier, truck: r.truck, driver: r.driver, move_type: r.move_type, appointment: r.appointment, override: needsOverride.value ? override.value : '', container: r.container || newNo.value, container_type: newType.value, booking_ref: r.booking_ref })
+    await act('start_visit', { lane: lane.value, carrier: r.carrier, truck: r.truck, driver: r.driver, move_type: r.move_type, appointment: r.appointment, override: needsOverride.value ? override.value : '', container: r.container || newNo.value, container_type: newType.value, shipping_line: newLine.value, booking_ref: r.booking_ref })
     emit('started'); emit('close')
   } catch (e: any) { error.value = e.message } finally { starting.value = false }
 }
@@ -160,6 +162,7 @@ const windowText = computed(() => {
         </Field>
         <template v-if="isNew">
           <Field label="Container number (optional now)" hint="The truck's container number, if you can read it. If you leave it empty, record it at the portal read step."><input v-model="newNo" class="tos-input font-mono" autocomplete="off" /></Field>
+          <Field label="Shipping line" hint="Its name is printed on the container in the 3D yard."><select v-model="newLine" class="tos-input"><option value="">None / not known</option><option v-for="l in lines" :key="l.name" :value="l.name">{{ l.line_name }}</option></select></Field>
           <Field label="Container type" hint="Needed because this container is new to the system."><select v-model="newType" class="tos-input"><option value="">Choose…</option><option v-for="t in ctypes" :key="t.name" :value="t.name">{{ t.name }} · {{ t.length_ft }} ft<template v-if="t.description"> · {{ t.description }}</template></option></select></Field>
         </template>
         <Field v-if="needsOverride" label="Approved override" :hint="matching.length ? 'This truck is outside its slot window, so an approved override is needed.' : undefined">

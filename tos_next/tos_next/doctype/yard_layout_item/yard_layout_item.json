@@ -1,0 +1,175 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "item_type",
+  "label",
+  "yard_block",
+  "shape",
+  "cb_pos",
+  "x",
+  "z",
+  "rotation",
+  "sb_size",
+  "length",
+  "width",
+  "height",
+  "cb_look",
+  "surface",
+  "colour",
+  "direction",
+  "door_side",
+  "sb_points",
+  "points",
+  "locked"
+ ],
+ "fields": [
+  {
+   "fieldname": "item_type",
+   "fieldtype": "Select",
+   "label": "Type",
+   "options": "Block\nHeap\nRoad\nGround\nBuilding\nGate\nCar Park\nTruck Park\nRail Track\nCrane\nWeighbridge\nFence\nLight Mast\nTree\nLabel",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label",
+   "in_list_view": 1,
+   "columns": 2,
+   "description": "Shown in the 3D yard for buildings, heaps, parks and labels"
+  },
+  {
+   "fieldname": "yard_block",
+   "fieldtype": "Link",
+   "label": "Yard Block",
+   "options": "Yard Block",
+   "depends_on": "eval:doc.item_type==\"Block\"",
+   "mandatory_depends_on": "eval:doc.item_type==\"Block\"",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "shape",
+   "fieldtype": "Select",
+   "label": "Shape",
+   "options": "Rectangle\nPolygon\nPolyline",
+   "default": "Rectangle",
+   "depends_on": "eval:doc.item_type!=\"Block\"",
+   "description": "Rectangle uses position, size and rotation. Polygon and polyline use the points below."
+  },
+  {
+   "fieldname": "cb_pos",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "x",
+   "fieldtype": "Float",
+   "label": "Centre X (m)",
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "East-west position of the centre, in metres"
+  },
+  {
+   "fieldname": "z",
+   "fieldtype": "Float",
+   "label": "Centre Z (m)",
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "North-south position of the centre, in metres"
+  },
+  {
+   "fieldname": "rotation",
+   "fieldtype": "Float",
+   "label": "Rotation (degrees)",
+   "description": "Clockwise when seen from above"
+  },
+  {
+   "fieldname": "sb_size",
+   "fieldtype": "Section Break",
+   "label": "Size and look"
+  },
+  {
+   "fieldname": "length",
+   "fieldtype": "Float",
+   "label": "Length (m)",
+   "description": "Along the item before it is rotated"
+  },
+  {
+   "fieldname": "width",
+   "fieldtype": "Float",
+   "label": "Width (m)",
+   "description": "Across the item. For a rail track or crane this is the gauge"
+  },
+  {
+   "fieldname": "height",
+   "fieldtype": "Float",
+   "label": "Height (m)"
+  },
+  {
+   "fieldname": "cb_look",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "surface",
+   "fieldtype": "Select",
+   "label": "Surface",
+   "options": "\nAsphalt\nConcrete\nGravel\nGrass\nSand\nWater",
+   "depends_on": "eval:doc.item_type==\"Ground\""
+  },
+  {
+   "fieldname": "colour",
+   "fieldtype": "Color",
+   "label": "Colour",
+   "description": "Overrides the default colour"
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Direction",
+   "options": "Two-way\nOne-way forward\nOne-way reverse",
+   "default": "Two-way",
+   "depends_on": "eval:doc.item_type==\"Road\""
+  },
+  {
+   "fieldname": "door_side",
+   "fieldtype": "Select",
+   "label": "Container Doors Face",
+   "options": "Lower bay end\nHigher bay end",
+   "default": "Lower bay end",
+   "depends_on": "eval:doc.item_type==\"Block\""
+  },
+  {
+   "fieldname": "sb_points",
+   "fieldtype": "Section Break",
+   "label": "Points",
+   "depends_on": "eval:doc.item_type!=\"Block\" && doc.shape!=\"Rectangle\""
+  },
+  {
+   "fieldname": "points",
+   "fieldtype": "Long Text",
+   "label": "Points",
+   "description": "One point per line as x,z in metres, for example 120,40"
+  },
+  {
+   "fieldname": "locked",
+   "fieldtype": "Check",
+   "label": "Locked",
+   "description": "A locked item cannot be moved in the designer"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-13 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Yard Layout Item",
+ "owner": "Administrator",
+ "states": [],
+ "istable": 1,
+ "editable_grid": 1,
+ "permissions": []
+}

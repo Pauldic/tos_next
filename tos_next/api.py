@@ -7,6 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, get_datetime, get_time, getdate, now_datetime, nowdate
 
+from tos_next import layout as yard_layout
 from tos_next import yard
 
 NEEDS_TARGET = {"Yard Shift", "Reshuffle", "From Gate In", "From Vessel"}
@@ -45,7 +46,8 @@ def yard_snapshot(terminal=None):
                                  fields=["name", "shipping_line", "container_type", "length_ft", "slot_span", "cargo_status",
                                          "yard_stack", "partner_stack", "tier", "is_on_hold"])
     lines = frappe.get_list("Shipping Line", fields=["name", "line_name", "colour"], limit_page_length=0)
-    return {"terminal": terminal, "as_of": str(now_datetime()), "blocks": blocks, "stacks": stacks, "containers": containers, "lines": lines}
+    return {"terminal": terminal, "as_of": str(now_datetime()), "blocks": blocks, "stacks": stacks, "containers": containers, "lines": lines,
+            "layout": yard_layout.effective(terminal)}
 
 
 @frappe.whitelist()

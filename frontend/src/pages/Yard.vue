@@ -13,7 +13,7 @@ const { resolvedColorScheme } = useColorScheme()
 
 const host = ref<HTMLElement>()
 let scene: YardScene | null = null
-const snap = ref<Snapshot>({ blocks: [], stacks: [], containers: [], lines: [] })
+const snap = ref<Snapshot>({ blocks: [], stacks: [], containers: [], lines: [], layout: null })
 const error = ref('')
 const loading = ref(false)
 
@@ -31,7 +31,7 @@ async function load() {
   try {
     const s = (await tos('yard_snapshot', { terminal: terminal.value })) as Snapshot
     snap.value = s
-    scene?.setData(s, { ...filter }) 
+    scene?.setData(s, { ...filter })
     if (picked.value) loadDetail(picked.value)
     error.value = ''
   } catch (e: any) { error.value = e.message } finally { loading.value = false; inFlight = false }
@@ -39,7 +39,7 @@ async function load() {
 let debounce: ReturnType<typeof setTimeout>
 const soon = () => { clearTimeout(debounce); debounce = setTimeout(load, 400) }
 
-const { live } = useRealtime(terminal, ['yard_move_started', 'yard_move_done', 'hold_changed', 'gate_status'], () => soon())
+const { live } = useRealtime(terminal, ['yard_move_started', 'yard_move_done', 'hold_changed', 'gate_status', 'layout_published'], () => soon())
 let poll: ReturnType<typeof setInterval>
 onMounted(() => {
   scene = new YardScene(host.value!, {

@@ -1,0 +1,179 @@
+{
+ "actions": [],
+ "creation": "2026-11-13 07:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "terminal",
+  "layout_name",
+  "status",
+  "version",
+  "cb1",
+  "base_surface",
+  "based_on",
+  "published_by",
+  "published_on",
+  "sb_items",
+  "items",
+  "sb_notes",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "layout_name",
+   "fieldtype": "Data",
+   "label": "Layout Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Draft\nPublished\nArchived",
+   "default": "Draft",
+   "read_only": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "version",
+   "fieldtype": "Int",
+   "label": "Version",
+   "read_only": 1,
+   "no_copy": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "base_surface",
+   "fieldtype": "Select",
+   "label": "Ground Under Everything",
+   "options": "Default\nAsphalt\nConcrete\nGravel\nGrass\nSand",
+   "default": "Default",
+   "description": "The surface of the whole site. Roads, buildings and other items sit on top of it."
+  },
+  {
+   "fieldname": "based_on",
+   "fieldtype": "Link",
+   "label": "Started From",
+   "options": "Yard Layout",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "published_by",
+   "fieldtype": "Link",
+   "label": "Published By",
+   "options": "User",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "published_on",
+   "fieldtype": "Datetime",
+   "label": "Published On",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "sb_items",
+   "fieldtype": "Section Break",
+   "label": "Items"
+  },
+  {
+   "fieldname": "items",
+   "fieldtype": "Table",
+   "label": "Items",
+   "options": "Yard Layout Item"
+  },
+  {
+   "fieldname": "sb_notes",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-11-13 07:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Yard Layout",
+ "owner": "Administrator",
+ "states": [],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1,
+   "write": 1,
+   "create": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1,
+ "autoname": "format:YL-{terminal}-{#####}",
+ "naming_rule": "Expression",
+ "title_field": "layout_name"
+}

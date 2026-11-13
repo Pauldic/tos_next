@@ -24,7 +24,15 @@
   "auto_create_gate_in_order",
   "gate_in_order_priority",
   "cb_yard",
-  "operators_can_take_jobs"
+  "operators_can_take_jobs",
+  "sb_geometry",
+  "slot_length_m",
+  "row_pitch_m",
+  "tier_height_m",
+  "cb_geometry",
+  "block_gap_m",
+  "car_bay_width_m",
+  "truck_bay_width_m"
  ],
  "fields": [
   {
@@ -156,11 +164,61 @@
    "label": "Operators Can Take Open Jobs",
    "default": "1",
    "description": "Off: only a planner assigns move orders."
+  },
+  {
+   "fieldname": "sb_geometry",
+   "fieldtype": "Section Break",
+   "label": "Yard Geometry (metres)",
+   "description": "How the 3D yard sizes things. Change these only if your yard is built differently."
+  },
+  {
+   "fieldname": "slot_length_m",
+   "fieldtype": "Float",
+   "label": "Slot Length (one 20 ft bay)",
+   "default": "6.4",
+   "description": "A 20 ft container is 6.06 m long; the rest is the gap between bays."
+  },
+  {
+   "fieldname": "row_pitch_m",
+   "fieldtype": "Float",
+   "label": "Row Pitch",
+   "default": "3.2",
+   "description": "Distance from the centre of one row to the next."
+  },
+  {
+   "fieldname": "tier_height_m",
+   "fieldtype": "Float",
+   "label": "Tier Height",
+   "default": "2.7",
+   "description": "Height of one container level, including the gap."
+  },
+  {
+   "fieldname": "cb_geometry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "block_gap_m",
+   "fieldtype": "Float",
+   "label": "Gap Between Blocks",
+   "default": "16",
+   "description": "Used when blocks are set out automatically."
+  },
+  {
+   "fieldname": "car_bay_width_m",
+   "fieldtype": "Float",
+   "label": "Car Bay Width",
+   "default": "2.5"
+  },
+  {
+   "fieldname": "truck_bay_width_m",
+   "fieldtype": "Float",
+   "label": "Truck Bay Width",
+   "default": "4"
   }
  ],
  "issingle": 1,
  "links": [],
- "modified": "2026-11-12 08:00:00.000000",
+ "modified": "2026-11-13 07:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "TOS Settings",
