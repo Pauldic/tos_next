@@ -1,4 +1,5 @@
 import type { LayoutItem } from './layoutRender'
+import { parsePoints } from './layoutRender'
 
 // Shared by the yard designer's editor, inspector and preview.
 export interface DItem extends LayoutItem {
@@ -17,7 +18,7 @@ export const KINDS: Kind[] = [
   { type: 'Truck Park', label: 'Truck park', icon: 'lucide-truck', group: 'Ground and roads', length: 48, width: 24, height: 0, surface: 'Asphalt', hint: 'Painted truck bays.', colour: '#94A3B8' },
   { type: 'Rail Track', label: 'Rail track', icon: 'lucide-train-track', group: 'Ground and roads', length: 100, width: 1.435, height: 0, hint: 'Width is the gauge between the rails.', colour: '#78716C' },
   { type: 'Building', label: 'Building', icon: 'lucide-building-2', group: 'Buildings and gates', length: 24, width: 16, height: 8, hint: 'Office, warehouse or workshop. The arrow shows the entrance.', colour: '#CBD5E1' },
-  { type: 'Gate', label: 'Gate', icon: 'lucide-door-open', group: 'Buildings and gates', length: 12, width: 8, height: 4, hint: 'Gate booth with barriers.', colour: '#38BDF8' },
+  { type: 'Gate', label: 'Gate', icon: 'lucide-door-open', group: 'Buildings and gates', length: 12, width: 10, height: 5, hint: 'Drive-through gate: a lane per 4 m of length, booths, barriers and a canopy. The arrow shows the way trucks drive in.', colour: '#38BDF8' },
   { type: 'Weighbridge', label: 'Weighbridge', icon: 'lucide-scale', group: 'Buildings and gates', length: 18, width: 4, height: 0.5, hint: 'A truck scale.', colour: '#A1A1AA' },
   { type: 'Heap', label: 'Heap', icon: 'lucide-mountain', group: 'Yard', length: 20, width: 20, height: 4, hint: 'A pile of bulk cargo.', colour: '#B8A58A' },
   { type: 'Crane', label: 'Crane', icon: 'lucide-construction', group: 'Equipment and scenery', length: 12, width: 30, height: 30, hint: 'A portal crane.', colour: '#F59E0B' },
@@ -34,7 +35,7 @@ export const drawOrder = (items: DItem[]) => [...items].sort((a, b) => ORDER.ind
 
 export const SURFACES = ['Asphalt', 'Concrete', 'Gravel', 'Grass', 'Sand', 'Water']
 export const BASE_SURFACES = ['Default', ...SURFACES]
-export const hasFront = (t: string) => t === 'Building'
+export const hasFront = (t: string) => t === 'Building' || t === 'Gate'
 export const resizable = (t: string) => !['Block', 'Light Mast', 'Tree'].includes(t)
 
 let counter = 0
@@ -113,3 +114,40 @@ export class History {
   undo() { return this.canUndo ? this.stack[--this.at] : null }
   redo() { return this.canRedo ? this.stack[++this.at] : null }
 }
+
+
+// ---------- shapes drawn by points ----------
+export interface DrawKind { id: string; label: string; icon: string; type: string; shape: 'Polygon' | 'Polyline'; min: number; hint: string }
+export const DRAW_KINDS: DrawKind[] = [
+  { id: 'area', label: 'Paved outline', icon: 'lucide-pentagon', type: 'Ground', shape: 'Polygon', min: 3, hint: 'Draw any shape of paved, grass, sand or water ground.' },
+  { id: 'building', label: 'Building outline', icon: 'lucide-building', type: 'Building', shape: 'Polygon', min: 3, hint: 'A building with a shape of your own, such as an L.' },
+  { id: 'road', label: 'Winding road', icon: 'lucide-spline', type: 'Road', shape: 'Polyline', min: 2, hint: 'A road with bends. Click each bend.' },
+  { id: 'fence', label: 'Fence line', icon: 'lucide-fence', type: 'Fence', shape: 'Polyline', min: 2, hint: 'A fence that follows the boundary.' },
+]
+export const polygonal = (it: { shape?: string }) => it.shape === 'Polygon' || it.shape === 'Polyline'
+export const pointsOf = (it: DItem): [number, number][] => (polygonal(it) ? parsePoints(it.points) : [])
+const r2 = (n: number) => Math.round(n * 100) / 100
+export const pointsText = (pts: [number, number][]) => pts.map(([x, z]) => `${r2(x)},${r2(z)}`).join('\n')
+export const setPoints = (it: DItem, pts: [number, number][]) => { it.points = pointsText(pts) }
+export const minPoints = (it: DItem) => (it.shape === 'Polygon' ? 3 : 2)
+/** Types a rectangle can be turned into a shape of points: [shape]. */
+export const SHAPEABLE: Record<string, 'Polygon' | 'Polyline'> = { Ground: 'Polygon', 'Car Park': 'Polygon', 'Truck Park': 'Polygon', Heap: 'Polygon', Building: 'Polygon', Road: 'Polyline', Fence: 'Polyline' }
+export function toShape(it: DItem, blocks: DBlock[]) {
+  const shape = SHAPEABLE[it.item_type]
+  if (!shape) return false
+  const { l, w } = sizeOf(it, blocks)
+  const pts = shape === 'Polygon' ? [[-l / 2, -w / 2], [l / 2, -w / 2], [l / 2, w / 2], [-l / 2, w / 2]] : [[-l / 2, 0], [l / 2, 0]]
+  setPoints(it, pts.map(([a, b]) => { const p = toSite(it, a, b); return [p.x, p.z] as [number, number] }))
+  it.shape = shape
+  it.rotation = 0
+  return true
+}
+export function distToSegment(px: number, pz: number, a: [number, number], b: [number, number]) {
+  const dx = b[0] - a[0], dz = b[1] - a[1]
+  const l2 = dx * dx + dz * dz
+  const t = l2 ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / l2)) : 0
+  return Math.hypot(px - (a[0] + t * dx), pz - (a[1] + t * dz))
+}
+export const centroid = (pts: [number, number][]) => ({ x: pts.reduce((n, p) => n + p[0], 0) / (pts.length || 1), z: pts.reduce((n, p) => n + p[1], 0) / (pts.length || 1) })
+
+export interface Backdrop { image: string; x: number; z: number; width: number; rotation: number; opacity: number }

@@ -32,7 +32,7 @@ const SURFACES: Record<Theme, Record<string, string>> = {
   dark: { Asphalt: '#334155', Concrete: '#475569', Gravel: '#57534E', Grass: '#3F6B3A', Sand: '#8A7C52', Water: '#1E4F7A' },
 }
 const DEFAULTS: Record<string, { w: number; l: number; h: number }> = {
-  Building: { w: 20, l: 30, h: 8 }, Gate: { w: 12, l: 8, h: 4 }, 'Car Park': { w: 20, l: 30, h: 0 }, 'Truck Park': { w: 24, l: 40, h: 0 },
+  Building: { w: 20, l: 30, h: 8 }, Gate: { w: 10, l: 12, h: 5 }, 'Car Park': { w: 20, l: 30, h: 0 }, 'Truck Park': { w: 24, l: 40, h: 0 },
   Heap: { w: 20, l: 30, h: 3 }, 'Rail Track': { w: 1.435, l: 100, h: 0 }, Crane: { w: 30, l: 12, h: 30 }, Weighbridge: { w: 4, l: 18, h: 0.5 },
   Road: { w: 12, l: 60, h: 0 }, Ground: { w: 40, l: 40, h: 0 }, Fence: { w: 0.2, l: 50, h: 2.4 }, 'Light Mast': { w: 0.5, l: 0.5, h: 25 },
   Tree: { w: 5, l: 5, h: 7 }, Label: { w: 16, l: 4, h: 0 },
@@ -86,7 +86,7 @@ const lineMat = (color: string) => new THREE.LineBasicMaterial({ color })
 
 function flatShape(pts: [number, number][], color: string, y: number) {
   const shape = new THREE.Shape(pts.map(([x, z]) => new THREE.Vector2(x, z)))
-  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat(color))
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshStandardMaterial({ color, roughness: 0.9, side: THREE.DoubleSide })) // double sided: the flip below turns the face downward
   m.rotation.x = Math.PI / 2 // shape (x, y) -> world (x, z)
   m.position.y = y
   m.receiveShadow = true
@@ -171,7 +171,17 @@ export function buildLayoutItems(layout: YardLayout, theme: Theme, textColour: s
     switch (it.item_type) {
       case 'Ground': case 'Car Park': case 'Truck Park': case 'Heap': {
         const surf = colour || surfaceColour(it.surface, theme, it.item_type === 'Heap' ? 'Gravel' : it.item_type === 'Ground' ? 'Concrete' : 'Asphalt')
-        if (poly && poly.length > 2) { root.add(flatShape(poly, surf, y)); break }
+        if (poly && poly.length > 2) {
+          if (it.item_type === 'Heap') {
+            // a shaped heap is a flat-topped pile with the outline drawn
+            const pile = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(poly.map(([x, z]) => new THREE.Vector2(x, z))), { depth: hgt, bevelEnabled: false }), mat(colour || surfaceColour('Gravel', theme)))
+            pile.rotation.x = Math.PI / 2
+            pile.position.y = hgt
+            pile.castShadow = true; pile.receiveShadow = true
+            root.add(pile)
+          } else root.add(flatShape(poly, surf, y))
+          break
+        }
         if (it.item_type === 'Heap') {
           const cone = new THREE.Mesh(new THREE.CylinderGeometry(wid * 0.18, Math.min(len, wid) / 2, hgt, 20), mat(colour || surfaceColour('Gravel', theme)))
           cone.scale.set(len / Math.min(len, wid), 1, wid / Math.min(len, wid))
@@ -212,17 +222,43 @@ export function buildLayoutItems(layout: YardLayout, theme: Theme, textColour: s
         break
       }
       case 'Gate': {
-        // two lanes separated by a booth; barrier arms either side
-        const lane = Math.max(3, wid / 2)
-        grp.add(box(len, 0.05, wid, theme === 'light' ? '#94A3B8' : '#334155', 0, 0, 0, false))
-        grp.add(box(2.4, 3.2, 4, '#F1F5F9', 0, 0, 0))
-        grp.add(box(3, 0.3, 4.8, '#0EA5E9', 0, 3.2, 0))
-        for (const s of [-1, 1]) {
-          grp.add(box(0.4, 1.1, 0.4, '#475569', -len / 2 + 0.2, 0, s * lane / 2))
-          const arm = box(Math.max(2, lane - 0.6), 0.14, 0.14, '#EF4444', -len / 2 + 0.2 + Math.max(2, lane - 0.6) / 2, 1.0, s * lane / 2, false)
-          grp.add(arm)
+        // A drive-through gate: lanes about 4 m wide separated by booth islands, a canopy over the booths and a barrier arm at the
+        // entry end of every lane. Trucks drive toward +z (the way the arrow points on the plan); the barriers are on the -z side.
+        const n = Math.max(1, Math.round(len / 4))
+        const laneW = len / n
+        const depth = Math.min(wid, 12)
+        const asphalt = colour || (theme === 'light' ? '#64748B' : '#334155')
+        const kerb = theme === 'light' ? '#E2E8F0' : '#64748B'
+        const paint = theme === 'light' ? '#F8FAFC' : '#CBD5E1'
+        grp.add(box(len, 0.05, wid, asphalt, 0, 0, 0, false))
+        const dash: number[] = []
+        for (let i = 0; i < n; i++) {
+          const cx = -len / 2 + (i + 0.5) * laneW
+          for (let z = -wid / 2 + 1; z < wid / 2 - 1; z += 4) dash.push(cx, 0.08, z, cx, 0.08, Math.min(z + 2, wid / 2 - 1))
         }
-        if (it.label) { const t = textPlane(it.label, textColour, 12, 3); t.position.set(0, 4.2, -wid / 2 - 2); grp.add(t) }
+        grp.add(lines(dash, paint))
+        const zb = -depth / 2 - 0.4 // barrier line
+        for (let i = 0; i <= n; i++) {
+          const x = -len / 2 + i * laneW
+          const edge = i === 0 || i === n
+          const iw = edge ? 0.5 : 1.6
+          const ix = edge ? x + (i === 0 ? iw / 2 : -iw / 2) : x
+          grp.add(box(iw, 0.22, depth + 1, kerb, ix, 0.02, 0))
+          grp.add(box(0.3, 4.8, 0.3, '#64748B', ix, 0.24, depth * 0.38))
+          grp.add(box(0.3, 4.8, 0.3, '#64748B', ix, 0.24, -depth * 0.38))
+          if (!edge) {
+            grp.add(box(1.3, 2.7, 2.8, '#F1F5F9', x, 0.24, 0))
+            grp.add(box(1.36, 0.8, 2.0, '#93C5FD', x, 1.45, 0, false))
+          }
+        }
+        grp.add(box(len + 1.6, 0.45, depth * 0.85, colour ? colour : '#0EA5E9', 0, 5.0, 0))
+        for (let i = 0; i < n; i++) {
+          const x0 = -len / 2 + i * laneW + (i === 0 ? 0.5 : 0.8) // pole side of this lane
+          const al = laneW - (i === 0 ? 0.5 : 0.8) - 0.5
+          grp.add(box(0.3, 1.1, 0.3, '#475569', x0 - 0.15, 0.02, zb))
+          for (let k = 0; k < 4; k++) grp.add(box(al / 4, 0.14, 0.14, k % 2 ? '#F8FAFC' : '#EF4444', x0 + (k + 0.5) * (al / 4), 1.0, zb, false))
+        }
+        if (it.label) { const t = textPlane(it.label, textColour, Math.min(len + 4, 14), 3); t.position.set(0, 5.5, 0); grp.add(t) }
         root.add(grp)
         break
       }

@@ -6,8 +6,9 @@ import Modal from '../components/Modal.vue'
 import DesignCanvas from '../yard/DesignCanvas.vue'
 import { YardScene, type Snapshot } from '../yard/yard3d'
 import type { YardLayout } from '../yard/layoutRender'
-import { BASE_SURFACES, FACING, History, KINDS, SURFACES, blockEnrich, facingName, hasFront, kindOf, norm, plain, sizeOf, uid, type DBlock, type DItem } from '../yard/designerModel'
+import { BASE_SURFACES, DRAW_KINDS, FACING, History, KINDS, SHAPEABLE, SURFACES, blockEnrich, centroid, facingName, hasFront, kindOf, minPoints, norm, plain, pointsOf, polygonal, setPoints, sizeOf, toShape, uid, type Backdrop, type DBlock, type DItem, type DrawKind } from '../yard/designerModel'
 import { call, tos } from '../api'
+import { layoutBounds } from '../yard/layoutRender'
 import { useTerminal } from '../composables/useTerminal'
 
 const { selected: terminal } = useTerminal()
@@ -32,6 +33,14 @@ const snapSize = ref(1)
 const mode = ref<'split' | 'plan' | '3d'>('split')
 const canvas = ref<InstanceType<typeof DesignCanvas>>()
 const history = new History()
+const tool = ref<'select' | 'draw' | 'calibrate'>('select')
+const drawKind = ref<DrawKind | null>(null)
+const vertexIdx = ref(-1)
+const backdrop = ref<Backdrop>({ image: '', x: 0, z: 0, width: 0, rotation: 0, opacity: 50 })
+const bdAspect = ref(0.75)
+const backdropEdit = ref(false)
+const backdropHeight = computed(() => backdrop.value.width * bdAspect.value)
+const previewing = ref<{ name: string; version: number; layout: any } | null>(null)
 const histTick = ref(0) // makes undo/redo buttons react
 
 const only = computed(() => (selected.value.length === 1 ? items.value.find((i) => i.uid === selected.value[0]) || null : null))
@@ -44,7 +53,7 @@ const groups = computed(() => {
 const locked = computed(() => !!only.value?.locked)
 
 // ---------- load and save ----------
-const key = () => JSON.stringify(items.value) + '|' + baseSurface.value
+const key = () => JSON.stringify(items.value) + '|' + baseSurface.value + '|' + JSON.stringify(backdrop.value)
 let savedKey = ''
 const saveState = ref<'saved' | 'dirty' | 'saving' | 'error' | 'conflict'>('saved')
 let saveTimer: ReturnType<typeof setTimeout>
@@ -55,7 +64,7 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const d: any = await api('designer_data', { terminal: terminal.value })
+    const d: any = await api('designer_data', { terminal: terminal.value }, true)
     draft.value = d.draft
     modified.value = d.modified
     canPublish.value = d.can_publish
@@ -63,6 +72,11 @@ async function load() {
     blocks.value = d.blocks
     geometry.value = d.geometry
     baseSurface.value = d.base_surface
+    backdrop.value = d.backdrop
+    measureBackdrop()
+    previewing.value = null
+    tool.value = 'select'
+    vertexIdx.value = -1
     items.value = d.items.map((r: any) => ({ ...r, uid: uid() }))
     selected.value = []
     savedKey = key()
@@ -95,7 +109,7 @@ async function doSave() {
   const k = key()
   saveState.value = 'saving'
   try {
-    const r: any = await api('save_draft', { layout: draft.value, items: items.value.map(plain), base_surface: baseSurface.value, modified: modified.value }, true)
+    const r: any = await api('save_draft', { layout: draft.value, items: items.value.map(plain), base_surface: baseSurface.value, backdrop: backdrop.value, modified: modified.value }, true)
     modified.value = r.modified
     savedKey = k
     saveState.value = key() === savedKey ? 'saved' : 'dirty'
@@ -117,6 +131,7 @@ function commit() {
   markDirty()
 }
 watch(baseSurface, () => markDirty())
+watch(backdrop, () => markDirty(), { deep: true })
 function applyHistory(state: string | null) {
   if (!state) return
   items.value = JSON.parse(state)
@@ -191,6 +206,139 @@ function toggleLock() {
   commit()
 }
 
+// ---------- shapes drawn by points ----------
+function startDraw(k: DrawKind) {
+  backdropEdit.value = false
+  drawKind.value = k
+  tool.value = 'draw'
+  selected.value = []
+  info.value = ''
+}
+function cancelTool() {
+  canvas.value?.cancelDraw()
+  tool.value = 'select'
+  drawKind.value = null
+}
+function onDrawn(pts: [number, number][]) {
+  const k = drawKind.value
+  if (!k || pts.length < k.min) { info.value = `A ${k?.label.toLowerCase() || 'shape'} needs at least ${k?.min} points.`; return }
+  const c = centroid(pts)
+  const it: DItem = {
+    uid: uid(), item_type: k.type, shape: k.shape, x: c.x, z: c.z, rotation: 0, length: 0, width: k.type === 'Road' ? 12 : k.type === 'Fence' ? 0.4 : 0,
+    height: k.type === 'Building' ? 8 : k.type === 'Fence' ? 2.4 : 0, surface: k.type === 'Ground' ? 'Concrete' : k.type === 'Road' ? 'Asphalt' : '', label: '', direction: 'Two-way', locked: 0,
+  }
+  setPoints(it, pts)
+  items.value.push(it)
+  tool.value = 'select'
+  drawKind.value = null
+  selected.value = [it.uid]
+  commit()
+}
+function editAsShape() {
+  if (!only.value || only.value.locked) return
+  if (toShape(only.value, blocks.value)) { vertexIdx.value = -1; commit() }
+}
+function deleteVertex() {
+  const it = only.value
+  if (!it || vertexIdx.value < 0 || it.locked) return
+  const pts = pointsOf(it)
+  if (pts.length <= minPoints(it)) { info.value = `A ${it.shape?.toLowerCase()} needs at least ${minPoints(it)} points. Delete the whole item instead.`; return }
+  pts.splice(vertexIdx.value, 1)
+  setPoints(it, pts)
+  vertexIdx.value = -1
+  commit()
+}
+
+// ---------- backdrop picture ----------
+const bd = ref({ open: false, loading: false, error: '' })
+const fileInput = ref<HTMLInputElement>()
+const cal = ref({ open: false, a: [0, 0] as [number, number], b: [0, 0] as [number, number], metres: '' as string | number, error: '' })
+function measureBackdrop() {
+  if (!backdrop.value.image) return
+  const img = new Image()
+  img.onload = () => { if (img.naturalWidth) bdAspect.value = img.naturalHeight / img.naturalWidth }
+  img.src = backdrop.value.image
+}
+async function uploadBackdrop(ev: Event) {
+  const input = ev.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  bd.value.loading = true
+  bd.value.error = ''
+  try {
+    await flush()
+    const form = new FormData()
+    form.append('file', file, file.name)
+    form.append('is_private', '1')
+    form.append('doctype', 'Yard Layout')
+    form.append('docname', draft.value)
+    const res = await fetch('/api/method/upload_file', { method: 'POST', credentials: 'same-origin', headers: { 'X-Frappe-CSRF-Token': (window as any).csrf_token || '' }, body: form })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.exception || data?.message || 'The upload failed')
+    const url: string = data.message.file_url
+    const box = layoutBounds(items.value.map((i) => blockEnrich(i, blocks.value)).filter(Boolean) as any[])
+    const c = box.isEmpty() ? { x: 0, z: 0 } : { x: (box.min.x + box.max.x) / 2, z: (box.min.z + box.max.z) / 2 }
+    backdrop.value = { image: url, x: Math.round(c.x), z: Math.round(c.z), width: backdrop.value.width || 200, rotation: 0, opacity: 55 }
+    measureBackdrop()
+    info.value = 'Picture added. Next, set its scale: click two points that are a known distance apart on the picture.'
+  } catch (e: any) { bd.value.error = e.message } finally { bd.value.loading = false }
+}
+function startCalibrate() {
+  bd.value.open = false
+  backdropEdit.value = false
+  tool.value = 'calibrate'
+  info.value = 'Click one end of a distance you know on the picture, then the other end.'
+}
+function onCalibrated(a: [number, number], b: [number, number]) {
+  tool.value = 'select'
+  info.value = ''
+  cal.value = { open: true, a, b, metres: '', error: '' }
+}
+function applyScale() {
+  const m = Number(cal.value.metres)
+  const d = Math.hypot(cal.value.b[0] - cal.value.a[0], cal.value.b[1] - cal.value.a[1])
+  if (!(m > 0) || d < 0.01) { cal.value.error = 'Enter the real distance in metres.'; return }
+  const f = m / d
+  const [ax, az] = cal.value.a
+  const bk = backdrop.value
+  backdrop.value = { ...bk, width: Math.round(bk.width * f * 100) / 100, x: Math.round((ax + f * (bk.x - ax)) * 100) / 100, z: Math.round((az + f * (bk.z - az)) * 100) / 100 }
+  cal.value.open = false
+}
+function removeBackdrop() {
+  backdrop.value = { image: '', x: 0, z: 0, width: 0, rotation: 0, opacity: 50 }
+  backdropEdit.value = false
+}
+
+// ---------- history ----------
+const hist = ref({ open: false, loading: false, error: '', rows: [] as any[], busy: '' })
+async function openHistory() {
+  hist.value = { open: true, loading: true, error: '', rows: [], busy: '' }
+  try { await flush(); hist.value.rows = (await api('layout_history', { terminal: terminal.value })) as any[] } catch (e: any) { hist.value.error = e.message } finally { hist.value.loading = false }
+}
+async function previewVersion(r: any) {
+  hist.value.busy = r.name
+  try {
+    const layout: any = await api('layout_view', { layout: r.name })
+    previewing.value = { name: r.layout_name || r.name, version: r.version, layout }
+    hist.value.open = false
+    mode.value = mode.value === 'plan' ? 'split' : mode.value
+    drawPreview()
+    scene?.fit()
+  } catch (e: any) { hist.value.error = e.message } finally { hist.value.busy = '' }
+}
+function endPreview() { previewing.value = null; drawPreview() }
+async function restore(r: any) {
+  hist.value.busy = r.name
+  try {
+    await api('restore_version', { layout: r.name, replace: 1 }, true)
+    hist.value.open = false
+    saveState.value = 'saved'
+    info.value = `Version ${r.version || ''} is now your draft. Publish it when you are happy with it.`
+    await load()
+  } catch (e: any) { hist.value.error = e.message } finally { hist.value.busy = '' }
+}
+
 function onKey(ev: KeyboardEvent) {
   const t = ev.target as HTMLElement
   if (t && /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return
@@ -199,8 +347,11 @@ function onKey(ev: KeyboardEvent) {
   if (mod && k === 'z') { ev.preventDefault(); ev.shiftKey ? redo() : undo() }
   else if (mod && k === 'y') { ev.preventDefault(); redo() }
   else if (mod && k === 'd') { ev.preventDefault(); duplicate() }
+  else if (k === 'enter' && tool.value === 'draw') { ev.preventDefault(); canvas.value?.finishDraw() }
+  else if (k === 'escape' && tool.value !== 'select') cancelTool()
+  else if ((k === 'delete' || k === 'backspace') && vertexIdx.value >= 0) { ev.preventDefault(); deleteVertex() }
   else if (k === 'delete' || k === 'backspace') { ev.preventDefault(); remove() }
-  else if (k === 'escape') selected.value = []
+  else if (k === 'escape') { selected.value = []; vertexIdx.value = -1 }
   else if (k === 'r' && !mod) rotateBy(ev.shiftKey ? -90 : 90)
   else if (k.startsWith('arrow') && selected.value.length) {
     ev.preventDefault()
@@ -230,6 +381,7 @@ function schedulePreview() {
 }
 function drawPreview() {
   if (!scene || !snapshot) return
+  if (previewing.value) { scene.setData({ ...snapshot, layout: previewing.value.layout }); return }
   const layout: YardLayout = {
     name: draft.value, version: 0, base_surface: baseSurface.value, automatic: false, geometry: geometry.value,
     items: items.value.map((i) => blockEnrich(i, blocks.value)).filter(Boolean) as any[],
@@ -311,7 +463,6 @@ const field = (it: DItem, f: string) => {
 const lengthLabel = (t: string) => (t === 'Crane' ? 'Length (along the quay)' : 'Length')
 const widthLabel = (t: string) => (t === 'Rail Track' ? 'Gauge' : t === 'Crane' ? 'Span' : t === 'Tree' ? 'Crown width' : 'Width')
 const blockOf = (it: DItem) => blocks.value.find((b) => b.name === it.yard_block)
-const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polyline'
 </script>
 
 <template>
@@ -336,6 +487,8 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
       <div class="flex overflow-hidden rounded-4 border border-outline-gray-2" role="group" aria-label="View">
         <button v-for="m in [['split', 'Both'], ['plan', 'Plan'], ['3d', '3D']]" :key="m[0]" :aria-pressed="mode === m[0]" :class="['px-2.5 py-1 text-sm', mode === m[0] ? 'bg-surface-gray-3 text-ink-gray-9' : 'text-ink-gray-6']" @click="mode = m[0] as any">{{ m[1] }}</button>
       </div>
+      <Button icon="lucide-image" tooltip="Backdrop picture to trace over" aria-label="Backdrop picture" @click="bd = { open: true, loading: false, error: '' }" />
+      <Button icon="lucide-history" tooltip="Layout history" aria-label="Layout history" @click="openHistory" />
       <Button label="Discard draft" @click="disc = { open: true, loading: false, error: '' }" />
       <Button variant="solid" label="Publish…" :disabled="!canPublish" :tooltip="canPublish ? '' : 'Only a Terminal Admin can publish'" @click="openPublish" />
     </div>
@@ -350,6 +503,14 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
           <div class="flex flex-wrap gap-1.5">
             <button v-for="b in unplaced" :key="b.name" draggable="true" class="rounded-4 border border-outline-amber-2 bg-surface-amber-1 px-2.5 py-1.5 text-sm text-ink-gray-8" :title="`${b.bay_count} bays × ${b.row_count} rows. Drag onto the plan or click to add.`" @dragstart="dragStart($event, 'block', b.name)" @click="addBlock(b.name)">
               Block {{ b.block_code }}
+            </button>
+          </div>
+        </section>
+        <section>
+          <p class="mb-1.5 text-xs font-medium uppercase tracking-wide text-ink-gray-5">Draw by points</p>
+          <div class="grid grid-cols-2 gap-1.5">
+            <button v-for="k in DRAW_KINDS" :key="k.id" :aria-pressed="tool === 'draw' && drawKind?.id === k.id" :class="['flex items-center gap-2 rounded-4 border px-2 py-1.5 text-left text-sm text-ink-gray-8 hover:bg-surface-gray-2', tool === 'draw' && drawKind?.id === k.id ? 'border-outline-gray-4 bg-surface-gray-3' : 'border-outline-gray-2']" :title="k.hint" @click="startDraw(k)">
+              <span :class="[k.icon, 'size-4 shrink-0']" aria-hidden="true" />{{ k.label }}
             </button>
           </div>
         </section>
@@ -376,7 +537,11 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
         </div>
         <div v-else class="space-y-3 text-sm">
           <p class="font-medium text-ink-gray-9">{{ only.item_type === 'Block' ? `Block ${blockOf(only)?.block_code || ''}` : kindOf(only.item_type)?.label || only.item_type }}</p>
-          <p v-if="polygonal(only)" class="text-ink-gray-5">This shape was drawn by points in the Desk. Point editing arrives in the next batch; you can still delete or lock it.</p>
+          <div v-if="polygonal(only)" class="space-y-1.5">
+            <p class="text-ink-gray-6">{{ pointsOf(only).length }} points. Drag a point to move it, double-click an edge to add one, or click a point and press Delete to remove it.</p>
+            <Button v-if="vertexIdx >= 0" label="Delete this point" icon-left="lucide-minus-circle" :disabled="locked" @click="deleteVertex" />
+          </div>
+          <Button v-else-if="SHAPEABLE[only.item_type]" label="Edit by points" icon-left="lucide-pentagon" :disabled="locked" @click="editAsShape" />
           <p v-if="locked" class="text-ink-gray-5">Locked: unlock to move or change it.</p>
 
           <label v-if="field(only, 'label')" class="block"><span class="text-ink-gray-6">Name shown in 3D</span>
@@ -393,11 +558,11 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
           </div>
 
           <div v-if="hasFront(only.item_type)">
-            <p class="text-ink-gray-6">Entrance faces <b class="text-ink-gray-9">{{ facingName(only.rotation || 0) || 'a custom angle' }}</b></p>
+            <p class="text-ink-gray-6">{{ only.item_type === 'Gate' ? 'Trucks drive toward' : 'Entrance faces' }} <b class="text-ink-gray-9">{{ facingName(only.rotation || 0) || 'a custom angle' }}</b></p>
             <div class="mt-1 grid grid-cols-4 gap-1">
               <button v-for="f in FACING" :key="f.label" :disabled="locked" :aria-pressed="facingName(only.rotation || 0) === f.label" :class="['rounded-4 border px-1 py-1 text-xs', facingName(only.rotation || 0) === f.label ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="face(f.rotation)">{{ f.label }}</button>
             </div>
-            <p class="mt-1 text-xs text-ink-gray-5">The red mark on the plan is the entrance.</p>
+            <p class="mt-1 text-xs text-ink-gray-5">{{ only.item_type === 'Gate' ? 'The arrows on the plan show the way trucks drive in; the barriers are on the opposite end.' : 'The red mark on the plan is the entrance.' }}</p>
           </div>
 
           <label v-if="only.item_type === 'Block'" class="block"><span class="text-ink-gray-6">Container doors face</span>
@@ -405,6 +570,7 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
             <span class="text-xs text-ink-gray-5">The orange edge on the plan is the door end.</span>
           </label>
 
+          <label v-if="polygonal(only) && only.shape === 'Polyline' && only.item_type === 'Road'" class="block"><span class="text-ink-gray-6">Road width (m)</span><input v-model.number="only.width" type="number" min="1" step="0.5" class="tos-input mt-1" :disabled="locked" @change="commit" /></label>
           <div v-if="field(only, 'size') && !polygonal(only)" class="grid grid-cols-2 gap-2">
             <label><span class="text-ink-gray-6">{{ lengthLabel(only.item_type) }} (m)</span><input v-model.number="only.length" type="number" min="0.2" step="0.5" class="tos-input mt-1" :disabled="locked" @change="commit" /></label>
             <label><span class="text-ink-gray-6">{{ widthLabel(only.item_type) }} (m)</span><input v-model.number="only.width" type="number" min="0.2" step="0.5" class="tos-input mt-1" :disabled="locked" @change="commit" /></label>
@@ -435,8 +601,20 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
     <!-- plan and preview -->
     <div class="relative grid min-h-0 flex-1 grid-cols-1 gap-px bg-outline-gray-1" :class="mode === 'split' ? 'lg:grid-cols-2' : ''">
       <section v-show="mode !== '3d'" class="relative min-h-[300px] overflow-hidden bg-surface-gray-2" aria-label="Plan editor">
-        <DesignCanvas ref="canvas" :items="items" :blocks="blocks" :selected="selected" :snap="snapSize" :geometry="geometry" @select="selected = $event" @commit="commit" @drop="onDrop" />
-        <div class="pointer-events-none absolute left-3 top-3 rounded-4 bg-surface-white/90 px-2 py-1 text-xs text-ink-gray-6 shadow-sm">Plan · north is up · scroll to zoom · drag empty space to pan</div>
+        <DesignCanvas
+          ref="canvas" :items="items" :blocks="blocks" :selected="selected" :snap="snapSize" :geometry="geometry" :tool="tool" :draw-closed="drawKind?.shape === 'Polygon'" :draw-min="drawKind?.min || 2" :vertex="vertexIdx"
+          :backdrop="backdrop" :backdrop-height="backdropHeight" :backdrop-edit="backdropEdit"
+          @select="selected = $event" @commit="commit" @drop="onDrop" @drawn="onDrawn" @calibrated="onCalibrated" @vertex="vertexIdx = $event"
+        />
+        <div v-if="tool !== 'select'" class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-3 rounded-5 border border-outline-gray-2 bg-surface-white px-3 py-1.5 text-sm text-ink-gray-8 shadow-lg">
+          <span v-if="tool === 'draw'">Click each point of the {{ drawKind?.label.toLowerCase() }}. Double-click or press Enter to finish.</span>
+          <span v-else>Click two points on the picture a known distance apart.</span>
+          <Button label="Cancel" @click="cancelTool" />
+        </div>
+        <div v-if="backdropEdit" class="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-3 rounded-5 border border-outline-gray-2 bg-surface-white px-3 py-1.5 text-sm text-ink-gray-8 shadow-lg">
+          <span>Drag the picture to move it.</span><Button label="Done" @click="backdropEdit = false" />
+        </div>
+        <div class="pointer-events-none absolute left-3 top-3 rounded-4 bg-surface-white/90 px-2 py-1 text-xs text-ink-gray-6 shadow-sm">Plan · north is up · scroll to zoom · drag empty space to pan · Shift-drag to select several</div>
         <div class="absolute bottom-3 left-3 flex gap-1.5">
           <Button icon="lucide-zoom-in" aria-label="Zoom in" @click="canvas?.zoomBy(1.3)" />
           <Button icon="lucide-zoom-out" aria-label="Zoom out" @click="canvas?.zoomBy(1 / 1.3)" />
@@ -445,7 +623,10 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
       </section>
       <section v-show="mode !== 'plan'" class="relative min-h-[300px] overflow-hidden bg-surface-gray-2" aria-label="3D preview">
         <div ref="host" class="absolute inset-0" />
-        <div class="pointer-events-none absolute left-3 top-3 rounded-4 bg-surface-white/90 px-2 py-1 text-xs text-ink-gray-6 shadow-sm">3D preview of this draft · not live until published</div>
+        <div v-if="!previewing" class="pointer-events-none absolute left-3 top-3 rounded-4 bg-surface-white/90 px-2 py-1 text-xs text-ink-gray-6 shadow-sm">3D preview of this draft · not live until published</div>
+        <div v-else class="absolute left-3 top-3 flex items-center gap-2 rounded-5 border border-outline-amber-2 bg-surface-amber-1 px-3 py-1.5 text-sm text-ink-gray-8 shadow-sm">
+          Previewing {{ previewing.version ? 'version ' + previewing.version : previewing.name }}, not your draft <Button label="Back to my draft" @click="endPreview" />
+        </div>
         <div class="absolute bottom-3 left-3"><Button label="Re-centre" icon-left="lucide-crosshair" @click="scene?.fit()" /></div>
       </section>
       <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center bg-surface-base/60 text-sm text-ink-gray-6">Loading the draft…</div>
@@ -478,5 +659,46 @@ const polygonal = (it: DItem) => it.shape === 'Polygon' || it.shape === 'Polylin
   </Modal>
   <Modal :open="disc.open" title="Discard this draft?" confirm-label="Discard draft" :loading="disc.loading" :error="disc.error" @close="disc.open = false" @confirm="doDiscard">
     <p class="text-sm text-ink-gray-7">Everything changed since the last publish is thrown away and you start again from the live layout. The live yard is not affected.</p>
+  </Modal>
+
+  <Modal :open="bd.open" title="Backdrop picture" hide-confirm :error="bd.error" @close="bd.open = false">
+    <p class="text-sm text-ink-gray-7">Put a site plan or aerial photo behind the plan and trace over it. It is only a guide: it does not appear in the 3D yard.</p>
+    <input ref="fileInput" type="file" accept="image/png,image/jpeg,image/webp" class="hidden" @change="uploadBackdrop" />
+    <div class="flex flex-wrap gap-2">
+      <Button :label="backdrop.image ? 'Replace picture' : 'Choose a picture'" icon-left="lucide-upload" :loading="bd.loading" @click="fileInput?.click()" />
+      <Button v-if="backdrop.image" label="Remove" icon-left="lucide-trash-2" theme="red" @click="removeBackdrop" />
+    </div>
+    <template v-if="backdrop.image">
+      <div class="flex flex-wrap gap-2">
+        <Button label="Set scale (two clicks)" icon-left="lucide-ruler" @click="startCalibrate" />
+        <Button label="Move the picture" icon-left="lucide-move" @click="backdropEdit = true; bd.open = false" />
+      </div>
+      <label class="block text-sm"><span class="text-ink-gray-6">Opacity: {{ backdrop.opacity }}%</span><input v-model.number="backdrop.opacity" type="range" min="10" max="100" class="mt-1 w-full" /></label>
+      <div class="grid grid-cols-2 gap-2 text-sm">
+        <label><span class="text-ink-gray-6">Width on the site (m)</span><input v-model.number="backdrop.width" type="number" min="1" step="1" class="tos-input mt-1" /></label>
+        <label><span class="text-ink-gray-6">Rotation (degrees)</span><input v-model.number="backdrop.rotation" type="number" step="1" class="tos-input mt-1" /></label>
+        <label><span class="text-ink-gray-6">Centre east–west (m)</span><input v-model.number="backdrop.x" type="number" step="1" class="tos-input mt-1" /></label>
+        <label><span class="text-ink-gray-6">Centre north–south (m)</span><input v-model.number="backdrop.z" type="number" step="1" class="tos-input mt-1" /></label>
+      </div>
+    </template>
+  </Modal>
+  <Modal :open="cal.open" title="How far apart are those two points?" confirm-label="Set scale" :error="cal.error" @close="cal.open = false" @confirm="applyScale">
+    <p class="text-sm text-ink-gray-7">Enter the real distance in metres between the two points you clicked, for example the length of a known road or building.</p>
+    <input v-model="cal.metres" type="number" min="0" step="0.1" class="tos-input" placeholder="Metres" aria-label="Real distance in metres" @keydown.enter.prevent="applyScale" />
+  </Modal>
+  <Modal :open="hist.open" title="Layout history" hide-confirm wide :error="hist.error" @close="hist.open = false">
+    <p v-if="hist.loading" class="text-sm text-ink-gray-5">Loading…</p>
+    <ul v-else class="divide-y divide-outline-gray-1 text-sm">
+      <li v-for="r in hist.rows" :key="r.name" class="flex flex-wrap items-center gap-2 py-2">
+        <div class="min-w-0 flex-1">
+          <p class="truncate font-medium text-ink-gray-9">{{ r.status === 'Draft' ? 'Your draft' : 'Version ' + r.version }} <span class="font-normal text-ink-gray-5">· {{ r.layout_name }}</span></p>
+          <p class="text-ink-gray-5">{{ r.status }} · {{ r.item_count }} items<template v-if="r.published_on"> · published {{ String(r.published_on).slice(0, 16) }} by {{ r.published_by }}</template></p>
+        </div>
+        <Badge :theme="r.status === 'Published' ? 'green' : r.status === 'Draft' ? 'orange' : 'gray'" :label="r.status" />
+        <Button label="Preview in 3D" :loading="hist.busy === r.name" @click="previewVersion(r)" />
+        <Button v-if="r.status !== 'Draft'" label="Restore as draft" :loading="hist.busy === r.name" @click="restore(r)" />
+      </li>
+    </ul>
+    <p class="text-xs text-ink-gray-5">Restoring copies that version into your draft, replacing the draft you have now. Nothing goes live until you publish.</p>
   </Modal>
 </template>

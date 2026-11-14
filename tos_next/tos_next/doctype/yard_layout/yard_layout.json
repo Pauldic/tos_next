@@ -13,6 +13,14 @@
   "based_on",
   "published_by",
   "published_on",
+  "sb_backdrop",
+  "backdrop_image",
+  "backdrop_width",
+  "cb_backdrop",
+  "backdrop_x",
+  "backdrop_z",
+  "backdrop_rotation",
+  "backdrop_opacity",
   "sb_items",
   "items",
   "sb_notes",
@@ -91,6 +99,48 @@
    "no_copy": 1
   },
   {
+   "fieldname": "sb_backdrop",
+   "fieldtype": "Section Break",
+   "label": "Backdrop (a picture to trace over; shown in the designer only)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "backdrop_image",
+   "fieldtype": "Attach Image",
+   "label": "Backdrop Image"
+  },
+  {
+   "fieldname": "backdrop_width",
+   "fieldtype": "Float",
+   "label": "Width on the Site (m)",
+   "description": "How wide the picture is on the ground. Set it in the yard designer with two clicks on a known distance."
+  },
+  {
+   "fieldname": "cb_backdrop",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "backdrop_x",
+   "fieldtype": "Float",
+   "label": "Centre East-West (m)"
+  },
+  {
+   "fieldname": "backdrop_z",
+   "fieldtype": "Float",
+   "label": "Centre North-South (m)"
+  },
+  {
+   "fieldname": "backdrop_rotation",
+   "fieldtype": "Float",
+   "label": "Rotation (degrees)"
+  },
+  {
+   "fieldname": "backdrop_opacity",
+   "fieldtype": "Int",
+   "label": "Opacity (%)",
+   "default": "50"
+  },
+  {
    "fieldname": "sb_items",
    "fieldtype": "Section Break",
    "label": "Items"
@@ -113,7 +163,7 @@
   }
  ],
  "links": [],
- "modified": "2026-11-13 07:00:00.000000",
+ "modified": "2026-11-14 06:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "Yard Layout",
