@@ -1,0 +1,135 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 08:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-14 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Container Event",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "event_time",
+ "sort_order": "DESC",
+ "autoname": "hash",
+ "naming_rule": "Random",
+ "title_field": "summary",
+ "in_create": 1,
+ "fields": [
+  {
+   "fieldname": "container",
+   "fieldtype": "Link",
+   "label": "Container",
+   "options": "Container",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "terminal",
+   "fieldtype": "Link",
+   "label": "Terminal",
+   "options": "Terminal",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "event_type",
+   "fieldtype": "Select",
+   "label": "Event",
+   "options": "Created\nStatus Change\nSeal\nDamage Recorded\nVessel\nCargo Details\nPlanning\nReefer\nHazard\nCommercial\nRemarks\nOther",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "event_time",
+   "fieldtype": "Datetime",
+   "label": "When",
+   "reqd": 1,
+   "in_list_view": 1,
+   "default": "Now"
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "event_by",
+   "fieldtype": "Link",
+   "label": "By",
+   "options": "User",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "source_doctype",
+   "fieldtype": "Link",
+   "label": "Source Document Type",
+   "options": "DocType"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Source Document",
+   "options": "source_doctype"
+  },
+  {
+   "fieldname": "sb_text",
+   "fieldtype": "Section Break",
+   "label": "What happened"
+  },
+  {
+   "fieldname": "summary",
+   "fieldtype": "Small Text",
+   "label": "Summary",
+   "reqd": 1
+  }
+ ],
+ "field_order": [
+  "container",
+  "terminal",
+  "event_type",
+  "event_time",
+  "cb1",
+  "event_by",
+  "source_doctype",
+  "source_name",
+  "sb_text",
+  "summary"
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 0,
+   "create": 0,
+   "delete": 0,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  }
+ ]
+}

@@ -142,10 +142,11 @@ def seed(terminal=None, blocks="A,B,C,D", bays=10, rows=6, containers=120, seed_
         stack = _random_place(iso, terminal, rnd)
         if not stack:
             break
-        cargo = "Reefer" if iso == "45R1" else rnd.choice(["Import", "Export", "Empty"])
+        cargo = "Import" if iso == "45R1" else rnd.choice(["Import", "Export", "Empty"])
+        category, full_empty = ("Storage", "MT") if cargo == "Empty" else (cargo, "FCL")
         c = frappe.get_doc({
             "doctype": "Container", "container_no": no, "terminal": terminal, "shipping_line": line[0],
-            "container_type": iso, "cargo_status": cargo, "status": "On Terminal",
+            "container_type": iso, "category": category, "full_empty": full_empty, "status": "On Terminal",
             "arrived_on": frappe.utils.add_to_date(None, days=-rnd.randint(0, 8)),
             "gross_weight_kg": rnd.randint(8000, 26000), "seal_no": f"SL{rnd.randint(100000, 999999)}",
         }).insert(ignore_permissions=True)

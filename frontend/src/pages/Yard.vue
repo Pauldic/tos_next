@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { Badge, Button, ErrorMessage, PageHeader, PageHeaderTitle, useColorScheme } from 'frappe-ui'
 import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
@@ -9,6 +10,7 @@ import { useTerminal } from '../composables/useTerminal'
 import { useRealtime } from '../composables/useRealtime'
 
 const { selected: terminal } = useTerminal()
+const route = useRoute()
 const { resolvedColorScheme } = useColorScheme()
 
 const host = ref<HTMLElement>()
@@ -17,13 +19,14 @@ const snap = ref<Snapshot>({ blocks: [], stacks: [], containers: [], lines: [], 
 const error = ref('')
 const loading = ref(false)
 
-const filter = reactive<Filter>({ line: null, holdsOnly: false, cargo: null })
+const filter = reactive<Filter>({ line: null, holdsOnly: false, cargo: null, hazmat: false, reefer: false })
 const hover = ref<{ name: string; x: number; y: number } | null>(null)
 const picked = ref<string | null>(null)
 const detail = ref<any>(null)
 
 // ---------- data ----------
 let inFlight = false
+let deepLinked = ''
 async function load() {
   if (inFlight || !terminal.value) return
   inFlight = true
@@ -33,6 +36,12 @@ async function load() {
     snap.value = s
     scene?.setData(s, { ...filter })
     if (picked.value) loadDetail(picked.value)
+    const want = route.query.container as string | undefined
+    if (want && want !== deepLinked) {
+      deepLinked = want
+      const r = s.containers.find((x) => x.name === want)
+      if (r) goTo(want, r)
+    }
     error.value = ''
   } catch (e: any) { error.value = e.message } finally { loading.value = false; inFlight = false }
 }
@@ -140,7 +149,9 @@ const dwell = (c: any) => (c.dwell_days == null ? '' : c.dwell_days + ' d on ter
         </div>
         <div class="mt-3 flex flex-wrap gap-1.5">
           <button :aria-pressed="!!filter.holdsOnly" :class="['rounded-full border px-2.5 py-1 text-xs', filter.holdsOnly ? 'border-outline-red-2 bg-surface-red-1 text-ink-red-3' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.holdsOnly = !filter.holdsOnly">On hold ({{ holdCount }})</button>
-          <button v-for="c in ['Full', 'Empty']" :key="c" :aria-pressed="filter.cargo === c" :class="['rounded-full border px-2.5 py-1 text-xs', filter.cargo === c ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.cargo = filter.cargo === c ? null : (c as any)">{{ c }}</button>
+          <button v-for="c in ['FCL', 'MT']" :key="c" :aria-pressed="filter.cargo === c" :class="['rounded-full border px-2.5 py-1 text-xs', filter.cargo === c ? 'border-outline-gray-4 bg-surface-gray-3 text-ink-gray-9' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.cargo = filter.cargo === c ? null : (c as any)">{{ c }}</button>
+          <button :aria-pressed="!!filter.hazmat" :class="['rounded-full border px-2.5 py-1 text-xs', filter.hazmat ? 'border-outline-amber-2 bg-surface-amber-1 text-ink-amber-3' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.hazmat = !filter.hazmat">Hazmat</button>
+          <button :aria-pressed="!!filter.reefer" :class="['rounded-full border px-2.5 py-1 text-xs', filter.reefer ? 'border-outline-blue-2 bg-surface-blue-1 text-ink-blue-3' : 'border-outline-gray-2 text-ink-gray-7']" @click="filter.reefer = !filter.reefer">Reefer</button>
         </div>
       </div>
     </div>
@@ -157,7 +168,7 @@ const dwell = (c: any) => (c.dwell_days == null ? '' : c.dwell_days + ' d on ter
     <!-- hover tooltip -->
     <div v-if="hover && hovered" class="pointer-events-none absolute z-10 rounded-5 border border-outline-gray-2 bg-surface-white px-2.5 py-1.5 text-xs shadow-lg" :style="{ left: hover.x + 14 + 'px', top: hover.y + 14 + 'px' }">
       <p class="text-sm font-medium text-ink-gray-9">{{ hovered.name }}</p>
-      <p class="text-ink-gray-6">{{ hovered.shipping_line }} · {{ hovered.length_ft }} ft · {{ hovered.cargo_status }}</p>
+      <p class="text-ink-gray-6">{{ hovered.shipping_line }} · {{ hovered.length_ft }} ft · {{ hovered.category }} {{ hovered.full_empty }}<template v-if="hovered.is_hazmat"> · Hazmat</template><template v-if="hovered.is_reefer"> · Reefer</template></p>
       <p class="text-ink-gray-5">{{ hovered.yard_stack }} · tier {{ hovered.tier }}</p>
     </div>
 
@@ -185,7 +196,10 @@ const dwell = (c: any) => (c.dwell_days == null ? '' : c.dwell_days + ' d on ter
       <div v-if="selectedC" class="space-y-1 border-b border-outline-gray-1 px-4 py-3 text-sm">
         <div class="flex justify-between"><span class="text-ink-gray-5">Line</span><span class="text-ink-gray-8">{{ selectedC.shipping_line }}</span></div>
         <div class="flex justify-between"><span class="text-ink-gray-5">Type</span><span class="text-ink-gray-8">{{ selectedC.container_type }} · {{ selectedC.length_ft }} ft</span></div>
-        <div class="flex justify-between"><span class="text-ink-gray-5">Cargo</span><span class="text-ink-gray-8">{{ selectedC.cargo_status }}<template v-if="selectedC.gross_weight_kg"> · {{ Math.round(selectedC.gross_weight_kg) }} kg</template></span></div>
+        <div class="flex justify-between"><span class="text-ink-gray-5">Cargo</span><span class="text-ink-gray-8">{{ selectedC.category }} · {{ selectedC.full_empty }}<template v-if="selectedC.gross_weight_kg"> · {{ Math.round(selectedC.gross_weight_kg) }} kg</template></span></div>
+        <div v-if="selectedC.position" class="flex justify-between"><span class="text-ink-gray-5">Position</span><span class="text-ink-gray-8">{{ selectedC.position }}</span></div>
+        <div v-if="selectedC.is_reefer" class="flex justify-between"><span class="text-ink-gray-5">Reefer</span><span class="text-ink-gray-8">{{ selectedC.reefer_set_temp_c != null ? selectedC.reefer_set_temp_c + ' °C' : 'no set temperature' }}</span></div>
+        <div v-if="selectedC.is_hazmat" class="rounded-4 bg-surface-amber-1 px-2 py-1 text-xs text-ink-amber-3"><b>Hazmat</b></div>
         <div class="flex justify-between"><span class="text-ink-gray-5">Dwell</span><span class="text-ink-gray-8">{{ dwell(selectedC) }}</span></div>
         <div v-if="selectedC.free_days_until" class="flex justify-between"><span class="text-ink-gray-5">Free until</span><span class="text-ink-gray-8">{{ selectedC.free_days_until }}</span></div>
         <div v-for="h in selectedC.holds" :key="h.hold_type + h.placed_on" class="mt-2 rounded-4 bg-surface-red-1 px-2 py-1 text-xs text-ink-red-3"><b>{{ h.hold_type }}</b><template v-if="h.reason"> · {{ h.reason }}</template></div>

@@ -1,0 +1,79 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 08:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-14 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Container Hazard",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "istable": 1,
+ "editable_grid": 1,
+ "fields": [
+  {
+   "fieldname": "imdg_class",
+   "fieldtype": "Select",
+   "label": "IMDG Class",
+   "options": "1.1\n1.2\n1.3\n1.4\n1.5\n1.6\n2.1\n2.2\n2.3\n3\n4.1\n4.2\n4.3\n5.1\n5.2\n6.1\n6.2\n7\n8\n9",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "un_number",
+   "fieldtype": "Data",
+   "label": "UN Number",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Four digits, for example 1203."
+  },
+  {
+   "fieldname": "packing_group",
+   "fieldtype": "Select",
+   "label": "Packing Group",
+   "options": "\nI\nII\nIII",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "proper_shipping_name",
+   "fieldtype": "Data",
+   "label": "Proper Shipping Name",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "flash_point_c",
+   "fieldtype": "Float",
+   "label": "Flash Point (\u00b0C)"
+  },
+  {
+   "fieldname": "marine_pollutant",
+   "fieldtype": "Check",
+   "label": "Marine Pollutant"
+  },
+  {
+   "fieldname": "limited_quantity",
+   "fieldtype": "Check",
+   "label": "Limited Quantity"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "field_order": [
+  "imdg_class",
+  "un_number",
+  "packing_group",
+  "proper_shipping_name",
+  "flash_point_c",
+  "marine_pollutant",
+  "limited_quantity",
+  "notes"
+ ],
+ "permissions": []
+}

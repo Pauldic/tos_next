@@ -83,7 +83,7 @@ def _tops(extra=None, limit=10):
     flt = {"terminal": TERMINAL, "status": "On Terminal", "is_on_hold": 0, "yard_stack": ["is", "set"]}
     flt.update(extra or {})
     out = []
-    for c in frappe.get_all("Container", filters=flt, fields=["name", "yard_stack", "tier", "cargo_status", "length_ft"], order_by="arrived_on asc", limit_page_length=300):
+    for c in frappe.get_all("Container", filters=flt, fields=["name", "yard_stack", "tier", "category", "full_empty", "length_ft"], order_by="arrived_on asc", limit_page_length=300):
         if c.tier == frappe.db.get_value("Yard Stack", c.yard_stack, "tier_count") and not frappe.db.exists("Appointment", {"container": c.name, "status": ["in", ["Booked", "Late", "Arrived", "In Progress"]]}):
             out.append(c)
         if len(out) >= limit:
@@ -94,7 +94,7 @@ def _tops(extra=None, limit=10):
 def _setup_holds():
     if frappe.db.exists("Container Hold", {"reference": "TESTKIT", "status": "Active"}):
         return
-    for c in _tops({"cargo_status": ["in", ["Export", "Empty"]]}, limit=2):
+    for c in _tops({"category": ["in", ["Export", "Storage"]]}, limit=2):
         frappe.get_doc({"doctype": "Container Hold", "container": c.name, "terminal": TERMINAL, "hold_type": "Customs",
                         "reason": "Test hold: customs inspection pending.", "reference": "TESTKIT", "status": "Active"}).insert(ignore_permissions=True)
 
@@ -160,7 +160,7 @@ def refresh_today():
                                       "booking_ref": f"TESTKIT-{n}-IN"}).insert(ignore_permissions=True).name
 
     # 2. clean Gate Out, carrier 2: pick up an import container that sits on top of its stack
-    pick = _tops({"cargo_status": "Import"}, limit=1)
+    pick = _tops({"category": "Import"}, limit=1)
     if pick:
         made["gate_out"] = frappe.get_doc({"doctype": "Appointment", "slot": slot, "move_type": "Import Pickup", "carrier": CARRIER_2, "truck": t2[0], "driver": d2[0],
                                            "container": pick[0].name, "booking_ref": f"TESTKIT-{n}-OUT"}).insert(ignore_permissions=True).name

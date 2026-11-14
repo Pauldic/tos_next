@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, date_diff, get_datetime, get_time, now_datetime, time_diff_in_seconds
 
-from tos_next import yard
+from tos_next import events, yard
 from tos_next.settings import auto_create_order, company, gate_window
 from tos_next.tos_next.doctype.appointment.appointment import slot_window
 from tos_next.tos_next.doctype.appointment_override.appointment_override import get_valid_override, mark_used
@@ -304,7 +304,8 @@ class GateTransaction(Document):
             c = frappe.get_doc({
                 "doctype": "Container", "container_no": self.container_no, "terminal": self.terminal,
                 "container_type": self.container_type, "shipping_line": self.shipping_line,
-                "cargo_status": "Export" if self.move_type == "Export Drop" else "Empty",
+                "category": "Export" if self.move_type == "Export Drop" else "Storage",
+                "full_empty": "FCL" if self.move_type == "Export Drop" else "MT",
             })
             c.insert(ignore_permissions=True)
         c.status = "On Terminal"
@@ -315,6 +316,8 @@ class GateTransaction(Document):
         c.gross_weight_kg = self.gross_weight_kg or c.gross_weight_kg
         c.save(ignore_permissions=True)
         yard.log_movement(c, "Gate In", to_stack=None, source_doctype="Gate Transaction", source_name=self.name)
+        if self.damage_found:
+            events.log(c.name, "Damage Recorded", self.damage_notes or _("Damage found at the gate."), self.terminal, "Gate Transaction", self.name)
         return c.name
 
     def _release(self):
@@ -322,7 +325,12 @@ class GateTransaction(Document):
         if c.is_on_hold:
             frappe.throw(_("{0} is on hold.").format(c.name))
         yard.move_container(c.name, None, "Gate Out", "Gate Transaction", self.name)
-        frappe.db.set_value("Container", c.name, "status", "Gated Out")
+        c = frappe.get_doc("Container", c.name)
+        c.status = "Gated Out"
+        seal = next((r for r in self.checks if r.step == "Seal Check"), None)
+        if seal and seal.result == "Passed":
+            c.seal_verified = 1
+        c.save(ignore_permissions=True)
         return c.name
 
     def _free_lane(self):

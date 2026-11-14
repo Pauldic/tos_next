@@ -3,35 +3,26 @@
  "creation": "2026-10-26 07:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
- "field_order": [
-  "container_no",
-  "terminal",
-  "shipping_line",
-  "container_type",
-  "cb1",
-  "cargo_status",
-  "status",
-  "is_on_hold",
-  "sb_size",
-  "length_ft",
-  "slot_span",
-  "cb2",
-  "gross_weight_kg",
-  "vgm_kg",
-  "seal_no",
-  "sb_pos",
-  "yard_stack",
-  "partner_stack",
-  "cb3",
-  "tier",
-  "sb_dates",
-  "arrived_on",
-  "free_days_until",
-  "cb4",
-  "booking_ref",
-  "bill_of_lading"
- ],
+ "links": [],
+ "modified": "2026-11-14 13:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Container",
+ "owner": "Administrator",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "naming_rule": "By script",
+ "title_field": "container_no",
+ "search_fields": "shipping_line,category,full_empty",
+ "show_title_field_in_link": 1,
  "fields": [
+  {
+   "fieldname": "sb_id",
+   "fieldtype": "Section Break",
+   "label": "Identity"
+  },
   {
    "fieldname": "container_no",
    "fieldtype": "Data",
@@ -39,8 +30,7 @@
    "reqd": 1,
    "unique": 1,
    "in_list_view": 1,
-   "set_only_once": 1,
-   "description": "ISO 6346, for example NWDU4829107"
+   "set_only_once": 1
   },
   {
    "fieldname": "terminal",
@@ -51,31 +41,56 @@
    "in_standard_filter": 1
   },
   {
+   "fieldname": "container_type",
+   "fieldtype": "Link",
+   "label": "ISO / Spec",
+   "options": "Container Type",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
    "fieldname": "shipping_line",
    "fieldtype": "Link",
-   "label": "Shipping Line",
+   "label": "Carrier Line",
    "options": "Shipping Line",
    "in_list_view": 1,
    "in_standard_filter": 1
   },
   {
-   "fieldname": "container_type",
+   "fieldname": "line",
    "fieldtype": "Link",
-   "label": "Container Type",
-   "options": "Container Type",
-   "reqd": 1,
-   "in_list_view": 1
+   "label": "Line",
+   "options": "Shipping Line",
+   "description": "The line that operates or owns the container, if different from the carrier line."
+  },
+  {
+   "fieldname": "terminal_line",
+   "fieldtype": "Link",
+   "label": "Terminal Line",
+   "options": "Shipping Line",
+   "description": "The line the terminal handles and bills this container under."
   },
   {
    "fieldname": "cb1",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "cargo_status",
+   "fieldname": "category",
    "fieldtype": "Select",
-   "label": "Cargo",
-   "options": "Import\nExport\nEmpty\nReefer\nTransshipment",
+   "label": "Category",
+   "options": "Import\nExport\nTransshipment\nStorage",
    "reqd": 1,
+   "default": "Import",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "full_empty",
+   "fieldtype": "Select",
+   "label": "F/E",
+   "options": "FCL\nLCL\nMT",
+   "reqd": 1,
+   "default": "FCL",
    "in_list_view": 1,
    "in_standard_filter": 1
   },
@@ -90,17 +105,30 @@
    "in_standard_filter": 1
   },
   {
+   "fieldname": "transit_state",
+   "fieldtype": "Select",
+   "label": "Transit State",
+   "options": "Expected\nAwaiting Slot\nYard\nOn Vessel\nGated Out",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "description": "Worked out from the status and the yard position."
+  },
+  {
    "fieldname": "is_on_hold",
    "fieldtype": "Check",
    "label": "On Hold",
    "read_only": 1,
-   "in_standard_filter": 1,
-   "no_copy": 1
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "group_code",
+   "fieldtype": "Data",
+   "label": "Group Code"
   },
   {
    "fieldname": "sb_size",
    "fieldtype": "Section Break",
-   "label": "Size"
+   "label": "Size, Weight and Seal"
   },
   {
    "fieldname": "length_ft",
@@ -114,8 +142,14 @@
    "fieldtype": "Int",
    "label": "Yard Slots Used",
    "fetch_from": "container_type.slot_span",
-   "read_only": 1,
-   "description": "1 for 20 ft, 2 for 40 ft and 45 ft"
+   "read_only": 1
+  },
+  {
+   "fieldname": "is_reefer",
+   "fieldtype": "Check",
+   "label": "Reefer",
+   "fetch_from": "container_type.is_reefer",
+   "read_only": 1
   },
   {
    "fieldname": "cb2",
@@ -137,10 +171,31 @@
    "label": "Seal Number"
   },
   {
+   "fieldname": "seal_verified",
+   "fieldtype": "Check",
+   "label": "Seal Verified",
+   "read_only": 1,
+   "description": "Set when the Seal Check passes at Gate Out."
+  },
+  {
+   "fieldname": "seal_verified_on",
+   "fieldtype": "Datetime",
+   "label": "Seal Verified On",
+   "read_only": 1,
+   "depends_on": "seal_verified"
+  },
+  {
+   "fieldname": "seal_verified_by",
+   "fieldtype": "Link",
+   "label": "Seal Verified By",
+   "options": "User",
+   "read_only": 1,
+   "depends_on": "seal_verified"
+  },
+  {
    "fieldname": "sb_pos",
    "fieldtype": "Section Break",
-   "label": "Yard Position",
-   "description": "Changed only by yard moves, never edited by hand"
+   "label": "Yard Position"
   },
   {
    "fieldname": "yard_stack",
@@ -148,7 +203,6 @@
    "label": "Stack",
    "options": "Yard Stack",
    "read_only": 1,
-   "no_copy": 1,
    "in_standard_filter": 1
   },
   {
@@ -156,8 +210,7 @@
    "fieldtype": "Link",
    "label": "Second Stack (40 ft)",
    "options": "Yard Stack",
-   "read_only": 1,
-   "no_copy": 1
+   "read_only": 1
   },
   {
    "fieldname": "cb3",
@@ -167,8 +220,232 @@
    "fieldname": "tier",
    "fieldtype": "Int",
    "label": "Tier",
+   "read_only": 1
+  },
+  {
+   "fieldname": "position",
+   "fieldtype": "Data",
+   "label": "Position",
    "read_only": 1,
-   "no_copy": 1
+   "description": "Block, bay, row and tier in one line."
+  },
+  {
+   "fieldname": "planned_position",
+   "fieldtype": "Data",
+   "label": "Planned Position"
+  },
+  {
+   "fieldname": "sb_ib",
+   "fieldtype": "Section Break",
+   "label": "In-bound Vessel",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "ib_visit",
+   "fieldtype": "Link",
+   "label": "In-bound Visit",
+   "options": "Vessel Visit"
+  },
+  {
+   "fieldname": "ib_vessel_id",
+   "fieldtype": "Data",
+   "label": "In-bound Vessel ID",
+   "fetch_from": "ib_visit.vessel",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ib_vessel_name",
+   "fieldtype": "Data",
+   "label": "In-bound Vessel Name",
+   "fetch_from": "ib_visit.vessel_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ib_vessel_voyage",
+   "fieldtype": "Data",
+   "label": "In-bound Voyage",
+   "fetch_from": "ib_visit.ib_voyage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ib_vessel_class",
+   "fieldtype": "Data",
+   "label": "In-bound Vessel Class",
+   "fetch_from": "ib_visit.vessel_class",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_ob",
+   "fieldtype": "Section Break",
+   "label": "Out-bound Vessel",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "ob_visit",
+   "fieldtype": "Link",
+   "label": "Out-bound Visit",
+   "options": "Vessel Visit"
+  },
+  {
+   "fieldname": "ob_vessel_id",
+   "fieldtype": "Data",
+   "label": "Out-bound Vessel ID",
+   "fetch_from": "ob_visit.vessel",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ob_vessel_name",
+   "fieldtype": "Data",
+   "label": "Out-bound Vessel Name",
+   "fetch_from": "ob_visit.vessel_name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cb5",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ob_vessel_voyage",
+   "fieldtype": "Data",
+   "label": "Out-bound Voyage",
+   "fetch_from": "ob_visit.ob_voyage",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ob_vessel_class",
+   "fieldtype": "Data",
+   "label": "Out-bound Vessel Class",
+   "fetch_from": "ob_visit.vessel_class",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sb_route",
+   "fieldtype": "Section Break",
+   "label": "Routing and Consignee",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "pol",
+   "fieldtype": "Data",
+   "label": "Port of Loading (POL)",
+   "description": "UN/LOCODE, for example NGAPP."
+  },
+  {
+   "fieldname": "pod",
+   "fieldtype": "Data",
+   "label": "Port of Discharge (POD)"
+  },
+  {
+   "fieldname": "destination",
+   "fieldtype": "Data",
+   "label": "Destination"
+  },
+  {
+   "fieldname": "cb6",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "place_of_delivery",
+   "fieldtype": "Data",
+   "label": "Place of Delivery"
+  },
+  {
+   "fieldname": "consignee",
+   "fieldtype": "Data",
+   "label": "Consignee"
+  },
+  {
+   "fieldname": "sb_stow",
+   "fieldtype": "Section Break",
+   "label": "Special Stow",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "special_stow_1",
+   "fieldtype": "Link",
+   "label": "Special Stow 1",
+   "options": "Special Stow Code"
+  },
+  {
+   "fieldname": "special_stow_2",
+   "fieldtype": "Link",
+   "label": "Special Stow 2",
+   "options": "Special Stow Code"
+  },
+  {
+   "fieldname": "special_stow_3",
+   "fieldtype": "Link",
+   "label": "Special Stow 3",
+   "options": "Special Stow Code"
+  },
+  {
+   "fieldname": "cb7",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "special_stow_4",
+   "fieldtype": "Link",
+   "label": "Special Stow 4",
+   "options": "Special Stow Code"
+  },
+  {
+   "fieldname": "special_stow_5",
+   "fieldtype": "Link",
+   "label": "Special Stow 5",
+   "options": "Special Stow Code"
+  },
+  {
+   "fieldname": "sb_reefer",
+   "fieldtype": "Section Break",
+   "label": "Reefer",
+   "depends_on": "is_reefer",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "reefer_set_temp_c",
+   "fieldtype": "Float",
+   "label": "Set Temperature (\u00b0C)"
+  },
+  {
+   "fieldname": "reefer_plugged",
+   "fieldtype": "Check",
+   "label": "Plugged In"
+  },
+  {
+   "fieldname": "reefer_plugged_on",
+   "fieldtype": "Datetime",
+   "label": "Plugged In On",
+   "depends_on": "reefer_plugged"
+  },
+  {
+   "fieldname": "sb_hazard",
+   "fieldtype": "Section Break",
+   "label": "Hazard (IMDG)",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "is_hazmat",
+   "fieldtype": "Check",
+   "label": "Hazmat",
+   "read_only": 1,
+   "in_standard_filter": 1,
+   "description": "Ticked automatically when there is at least one row below."
+  },
+  {
+   "fieldname": "imdg_summary",
+   "fieldtype": "Data",
+   "label": "IMDG Classes",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hazards",
+   "fieldtype": "Table",
+   "label": "Dangerous Goods",
+   "options": "Container Hazard"
   },
   {
    "fieldname": "sb_dates",
@@ -178,8 +455,7 @@
   {
    "fieldname": "arrived_on",
    "fieldtype": "Datetime",
-   "label": "Arrived On",
-   "no_copy": 1
+   "label": "Time In"
   },
   {
    "fieldname": "free_days_until",
@@ -187,7 +463,7 @@
    "label": "Free Days Until"
   },
   {
-   "fieldname": "cb4",
+   "fieldname": "cb8",
    "fieldtype": "Column Break"
   },
   {
@@ -199,15 +475,127 @@
   {
    "fieldname": "bill_of_lading",
    "fieldtype": "Data",
-   "label": "Bill of Lading"
+   "label": "B/L Reference"
+  },
+  {
+   "fieldname": "sb_commercial",
+   "fieldtype": "Section Break",
+   "label": "Commercial and Billing",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "storage_paid_date",
+   "fieldtype": "Date",
+   "label": "Storage Paid Until"
+  },
+  {
+   "fieldname": "reefer_storage_paid",
+   "fieldtype": "Date",
+   "label": "Reefer Storage Paid Until"
+  },
+  {
+   "fieldname": "cb9",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "line_storage_paid",
+   "fieldtype": "Date",
+   "label": "Line Storage Paid Until"
+  },
+  {
+   "fieldname": "sb_remarks",
+   "fieldtype": "Section Break",
+   "label": "Remarks"
+  },
+  {
+   "fieldname": "remarks",
+   "fieldtype": "Small Text",
+   "label": "Remarks"
   }
  ],
- "links": [],
- "modified": "2026-10-26 07:00:00.000000",
- "modified_by": "Administrator",
- "module": "TOS Next",
- "name": "Container",
- "owner": "Administrator",
+ "field_order": [
+  "sb_id",
+  "container_no",
+  "terminal",
+  "container_type",
+  "shipping_line",
+  "line",
+  "terminal_line",
+  "cb1",
+  "category",
+  "full_empty",
+  "status",
+  "transit_state",
+  "is_on_hold",
+  "group_code",
+  "sb_size",
+  "length_ft",
+  "slot_span",
+  "is_reefer",
+  "cb2",
+  "gross_weight_kg",
+  "vgm_kg",
+  "seal_no",
+  "seal_verified",
+  "seal_verified_on",
+  "seal_verified_by",
+  "sb_pos",
+  "yard_stack",
+  "partner_stack",
+  "cb3",
+  "tier",
+  "position",
+  "planned_position",
+  "sb_ib",
+  "ib_visit",
+  "ib_vessel_id",
+  "ib_vessel_name",
+  "cb4",
+  "ib_vessel_voyage",
+  "ib_vessel_class",
+  "sb_ob",
+  "ob_visit",
+  "ob_vessel_id",
+  "ob_vessel_name",
+  "cb5",
+  "ob_vessel_voyage",
+  "ob_vessel_class",
+  "sb_route",
+  "pol",
+  "pod",
+  "destination",
+  "cb6",
+  "place_of_delivery",
+  "consignee",
+  "sb_stow",
+  "special_stow_1",
+  "special_stow_2",
+  "special_stow_3",
+  "cb7",
+  "special_stow_4",
+  "special_stow_5",
+  "sb_reefer",
+  "reefer_set_temp_c",
+  "reefer_plugged",
+  "reefer_plugged_on",
+  "sb_hazard",
+  "is_hazmat",
+  "imdg_summary",
+  "hazards",
+  "sb_dates",
+  "arrived_on",
+  "free_days_until",
+  "cb8",
+  "booking_ref",
+  "bill_of_lading",
+  "sb_commercial",
+  "storage_paid_date",
+  "reefer_storage_paid",
+  "cb9",
+  "line_storage_paid",
+  "sb_remarks",
+  "remarks"
+ ],
  "permissions": [
   {
    "role": "System Manager",
@@ -268,13 +656,5 @@
    "read": 1,
    "report": 1
   }
- ],
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "track_changes": 1,
- "naming_rule": "By script",
- "title_field": "container_no",
- "search_fields": "shipping_line,cargo_status",
- "show_title_field_in_link": 1
+ ]
 }

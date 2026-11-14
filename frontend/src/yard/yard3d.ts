@@ -24,7 +24,9 @@ export interface Snapshot {
 export interface Filter {
   line?: string | null
   holdsOnly?: boolean
-  cargo?: 'Full' | 'Empty' | null
+  cargo?: string | null
+  hazmat?: boolean
+  reefer?: boolean
 }
 interface Pos { x: number; y: number; z: number; len: number; yaw: number }
 
@@ -383,9 +385,9 @@ export class YardScene {
     const f = this.filter
     const c = this.byName.get(name)
     const col = this.lineColour(c.shipping_line)
-    if (c.cargo_status === 'Empty') col.lerp(new THREE.Color('#ffffff'), 0.4)
+    if (c.full_empty === 'MT') col.lerp(new THREE.Color('#ffffff'), 0.4)
     if (c.is_on_hold) col.lerp(new THREE.Color(t.hold), 0.65)
-    const match = (!f.line || c.shipping_line === f.line) && (!f.holdsOnly || c.is_on_hold) && (!f.cargo || c.cargo_status === f.cargo)
+    const match = (!f.line || c.shipping_line === f.line) && (!f.holdsOnly || c.is_on_hold) && (!f.cargo || c.full_empty === f.cargo) && (!f.hazmat || c.is_hazmat) && (!f.reefer || c.is_reefer)
     if (!match) col.copy(new THREE.Color(t.faded))
     if ((this.flashUntil.get(name) || 0) > performance.now()) col.lerp(new THREE.Color(t.flash), 0.75)
     return col

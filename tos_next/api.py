@@ -43,7 +43,7 @@ def yard_snapshot(terminal=None):
     stacks = frappe.get_list("Yard Stack", filters={"terminal": terminal}, limit_page_length=0,
                              fields=["name", "yard_block", "bay", "row_no", "tier_count", "max_tier", "is_blocked", "is_forty_anchor", "pair_stack"])
     containers = frappe.get_list("Container", filters={"terminal": terminal, "status": "On Terminal", "yard_stack": ["is", "set"]}, limit_page_length=0,
-                                 fields=["name", "shipping_line", "container_type", "length_ft", "slot_span", "cargo_status",
+                                 fields=["name", "shipping_line", "container_type", "length_ft", "slot_span", "category", "full_empty", "is_hazmat", "is_reefer", "transit_state", "position",
                                          "yard_stack", "partner_stack", "tier", "is_on_hold"])
     lines = frappe.get_list("Shipping Line", fields=["name", "line_name", "colour"], limit_page_length=0)
     return {"terminal": terminal, "as_of": str(now_datetime()), "blocks": blocks, "stacks": stacks, "containers": containers, "lines": lines,
@@ -56,7 +56,7 @@ def stack_detail(stack):
     frappe.has_permission("Yard Stack", "read", throw=True)
     rows = frappe.get_list(
         "Container", or_filters={"yard_stack": stack, "partner_stack": stack}, order_by="tier desc", limit_page_length=0,
-        fields=["name", "shipping_line", "container_type", "length_ft", "cargo_status", "status", "yard_stack", "partner_stack", "tier",
+        fields=["name", "shipping_line", "container_type", "length_ft", "category", "full_empty", "is_hazmat", "is_reefer", "reefer_set_temp_c", "transit_state", "position", "status", "yard_stack", "partner_stack", "tier",
                 "gross_weight_kg", "seal_no", "arrived_on", "free_days_until", "booking_ref", "is_on_hold"])
     names = [r.name for r in rows]
     holds = frappe.get_list("Container Hold", filters={"container": ["in", names], "status": "Active"},
@@ -78,7 +78,7 @@ def search_container(q, terminal=None):
     if len(q) < 2:
         return []
     return frappe.get_list("Container", filters={"terminal": terminal, "name": ["like", f"%{q}%"]}, limit_page_length=8,
-                           fields=["name", "status", "yard_stack", "partner_stack", "tier", "shipping_line", "cargo_status"])
+                           fields=["name", "status", "yard_stack", "partner_stack", "tier", "shipping_line", "category", "full_empty", "transit_state", "position"])
 
 
 @frappe.whitelist()

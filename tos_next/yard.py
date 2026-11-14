@@ -55,8 +55,12 @@ def get_blockers(container) -> list[str]:
     if not container.yard_stack:
         return []
     stacks = [s for s in (container.yard_stack, container.partner_stack) if s]
-    rows = frappe.db.sql("""select name from `tabContainer` where tier > %s and (yard_stack in %s or partner_stack in %s)
-           order by tier desc""", (container.tier, tuple(stacks), tuple(stacks)))
+    rows = frappe.db.sql(
+        """select name from `tabContainer`
+           where tier > %s and (yard_stack in %s or partner_stack in %s)
+           order by tier desc""",
+        (container.tier, tuple(stacks), tuple(stacks)),
+    )
     return [r[0] for r in rows]
 
 
@@ -123,16 +127,30 @@ def move_container(container_name, to_stack=None, movement_type="Yard Move",
     return c
 
 
+def wanted_block_type(c) -> str | None:
+    """The kind of block a container belongs in: hazmat first, then reefer, then empties, then its category."""
+    if c.get("is_hazmat"):
+        return "Hazmat"
+    if c.get("is_reefer"):
+        return "Reefer"
+    if c.get("full_empty") == "MT":
+        return "Empty"
+    return c.get("category") if c.get("category") in ("Import", "Export") else None
+
+
 def suggest_target(container_name: str) -> str | None:
     """Nearest suitable stack: same block first, lowest stack first, matching cargo type."""
     c = frappe.get_doc("Container", container_name)
     span = slot_span(c.container_type)
     cur = frappe.db.get_value("Yard Stack", c.yard_stack, ["yard_block", "bay", "row_no"], as_dict=True) if c.yard_stack else None
-    stacks = frappe.get_all("Yard Stack", filters={"terminal": c.terminal, "is_blocked": 0},
-        fields=["name", "yard_block", "bay", "row_no", "tier_count", "max_tier", "is_forty_anchor", "pair_stack"])
+    stacks = frappe.get_all(
+        "Yard Stack",
+        filters={"terminal": c.terminal, "is_blocked": 0},
+        fields=["name", "yard_block", "bay", "row_no", "tier_count", "max_tier", "is_forty_anchor", "pair_stack"],
+    )
     by_name = {s.name: s for s in stacks}
     block_types = {b.name: b.block_type for b in frappe.get_all("Yard Block", filters={"terminal": c.terminal}, fields=["name", "block_type"])}
-    wanted = {"Import": "Import", "Export": "Export", "Empty": "Empty", "Reefer": "Reefer"}.get(c.cargo_status)
+    wanted = wanted_block_type(c)
     own = {c.yard_stack, c.partner_stack}
     best, best_score = None, None
     for s in stacks:

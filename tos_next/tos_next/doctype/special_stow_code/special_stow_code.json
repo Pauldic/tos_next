@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 08:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-14 08:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "name": "Special Stow Code",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "autoname": "field:stow_code",
+ "naming_rule": "By fieldname",
+ "title_field": "stow_code",
+ "search_fields": "description",
+ "show_title_field_in_link": 1,
+ "fields": [
+  {
+   "fieldname": "stow_code",
+   "fieldtype": "Data",
+   "label": "Code",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "label": "Meaning",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "For example: stow on deck, away from heat, keep upright."
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1"
+  }
+ ],
+ "field_order": [
+  "stow_code",
+  "description",
+  "is_active"
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1,
+   "print": 1,
+   "share": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1,
+   "report": 1
+  }
+ ]
+}
