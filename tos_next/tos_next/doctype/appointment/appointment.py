@@ -5,6 +5,7 @@ import secrets
 
 import frappe
 from frappe import _
+from tos_next import transactions
 from frappe.model.document import Document
 from frappe.utils import add_to_date, get_datetime, get_time, getdate, now_datetime
 
@@ -12,8 +13,13 @@ from tos_next.tos_next.doctype.appointment_override.appointment_override import 
 from tos_next.realtime import publish
 from tos_next.settings import get as setting
 
-IN_MOVES = ("Export Drop", "Empty Return")
 ACTIVE = ("Booked", "Arrived", "In Progress", "Late")
+VISIT_TYPES = {"In": "Receive", "Out": "Deliver", "Both": "Receive and Deliver"}
+LINE_KEYS = ("move_type", "container", "container_length", "booking_ref")
+
+
+def line_direction(move_type):
+    return transactions.direction(move_type)
 
 
 def moving_same_slot(doc, slot):
@@ -28,12 +34,16 @@ def slot_window(slot):
 
 class Appointment(Document):
     def validate(self):
-        self.direction = "In" if self.move_type in IN_MOVES else "Out"
+        self.lines_from_header()
+        self.check_lines_editable()
+        self.check_lines()
         slot = frappe.get_doc("Slot Capacity", self.slot)
         self.terminal = slot.terminal
         self.slot_date, self.start_time, self.end_time = slot.slot_date, slot.start_time, slot.end_time
+        for line in self.lines:
+            transactions.assert_offered(line.move_type, self.terminal)
         self.check_parties(slot)
-        self.check_container()
+        self.check_chassis()
         if self.is_new():
             self.qr_token = secrets.token_urlsafe(12)
             self.check_slot(slot)
@@ -50,6 +60,8 @@ class Appointment(Document):
             frappe.throw(_("Slot {0} is closed: {1}").format(slot.name, slot.closed_reason or ""))
         allowed = {"All": None, "Gate In": "In", "Gate Out": "Out"}[slot.move_types]
         if allowed and allowed != self.direction:
+            if self.direction == "Both":
+                frappe.throw(_("Slot {0} only accepts Gate {1} jobs. A visit that receives and delivers needs a slot open to both.").format(slot.name, allowed))
             frappe.throw(_("Slot {0} only accepts Gate {1} moves.").format(slot.name, allowed))
         start, end = slot_window(slot)
         needs = []
@@ -83,21 +95,70 @@ class Appointment(Document):
             if booked_today >= carrier.daily_appointment_limit:
                 frappe.throw(_("{0} has reached its limit of {1} appointments on {2}.").format(carrier.name, carrier.daily_appointment_limit, slot.slot_date))
 
-    def check_container(self):
-        if not self.container:
+    # ---------- jobs (lines) ----------
+    def lines_from_header(self):
+        """Older callers (and the Desk form of an old record) give one job in move_type / container / booking_ref."""
+        if not self.get("lines") and self.move_type:
+            self.append("lines", {"move_type": self.move_type, "container": self.container or None, "booking_ref": self.booking_ref or None})
+
+    def check_lines_editable(self):
+        if self.is_new():
             return
-        c = frappe.get_doc("Container", self.container)
-        if self.move_type in ("Import Pickup", "Empty Pickup"):
-            if c.status != "On Terminal":
-                frappe.throw(_("{0} is not on the terminal.").format(c.name))
-            if c.is_on_hold:
-                frappe.throw(_("{0} is on hold and cannot be picked up.").format(c.name))
+        before = self.get_doc_before_save()
+        if not before or before.status in ("Booked", "Late"):
+            return
+        sig = lambda d: [tuple(l.get(k) for k in LINE_KEYS) for l in d.get("lines")]
+        if sig(before) != sig(self):
+            frappe.throw(_("The jobs of an appointment cannot be changed once the truck has arrived."))
+
+    def check_lines(self):
+        if not self.get("lines"):
+            frappe.throw(_("Add at least one job: a Receive or a Deliver."))
+        seen = set()
+        for i, line in enumerate(self.lines, 1):
+            where = _("Job {0}").format(i)
+            tt = transactions.get(line.move_type)
+            pending = line.status in (None, "", "Pending")
+            if line.container and not frappe.db.exists("Container", line.container):
+                if tt.direction == "Out":
+                    frappe.throw(_("{0}: container {1} is not in the system.").format(where, line.container))
+                line.container = None   # a container the terminal has not seen yet is created at the gate
+            if line.container:
+                c = frappe.get_doc("Container", line.container)
+                line.container_length = c.length_ft or line.container_length
+                if line.container in seen:
+                    frappe.throw(_("{0}: {1} is listed twice on this appointment.").format(where, line.container))
+                seen.add(line.container)
+                if pending:
+                    transactions.check_container_fits(tt, c, where)
+                    other = frappe.db.sql("""select a.name from `tabAppointment Line` l join `tabAppointment` a on a.name = l.parent
+                        where l.container = %s and l.status = 'Pending' and a.status in %s and a.name != %s limit 1""", (c.name, ACTIVE, self.name or ""))
+                    if other:
+                        frappe.throw(_("{0}: {1} already has an appointment: {2}.").format(where, c.name, other[0][0]))
+            if not line.container_length or int(line.container_length) < 1:
+                frappe.throw(_("{0}: give the size (ft) of the container, or choose the container.").format(where))
+            line.container_length = int(line.container_length)
+            if tt.requires_booking and not line.booking_ref:
+                frappe.throw(_("{0}: {1} needs a booking reference.").format(where, tt.name))
+            if tt.requires_container and not line.container:
+                frappe.throw(_("{0}: choose the container for {1}.").format(where, tt.name))
+            if not line.status:
+                line.status = "Pending"
+        dirs = {transactions.direction(l.move_type) for l in self.lines}
+        self.direction = "Both" if len(dirs) > 1 else dirs.pop()
+        self.visit_type = VISIT_TYPES[self.direction]
+        first = self.lines[0]
+        self.move_type, self.container, self.booking_ref = first.move_type, first.container, first.booking_ref
+
+    def check_chassis(self):
+        """What is on the truck at one time must fit its chassis: first everything it drops off, then everything it
+        picks up. A truck that brought one 40 ft can leave with one 40, one 20 or two 20 if its chassis allows it."""
         truck = frappe.get_cached_doc("Truck", self.truck)
-        if not truck.can_carry(c.length_ft or 40):
-            frappe.throw(_("Truck {0} cannot carry a {1} ft container.").format(truck.name, c.length_ft))
-        other = frappe.db.exists("Appointment", {"container": c.name, "status": ["in", ACTIVE], "name": ["!=", self.name]})
-        if other:
-            frappe.throw(_("{0} already has an appointment: {1}.").format(c.name, other))
+        if not truck.chassis_type:
+            frappe.throw(_("Truck {0} has no chassis type. Set it on the truck first.").format(truck.name))
+        live = [l for l in self.lines if l.status in (None, "", "Pending")]
+        truck.check_load([l.container_length for l in live if transactions.is_in(l.move_type)], _("receive"))
+        truck.check_load([l.container_length for l in live if not transactions.is_in(l.move_type)], _("deliver"))
 
     # ---------- capacity bookkeeping ----------
     def after_insert(self):
@@ -138,6 +199,9 @@ class Appointment(Document):
             frappe.throw(_("Only a booked or late appointment can be cancelled."))
         self.status = "Cancelled"
         self.cancel_reason = reason
+        for line in self.lines:
+            if line.status == "Pending":
+                line.status = "Cancelled"
         self.save()
         self._release_capacity()
 

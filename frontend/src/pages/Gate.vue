@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { Badge, Button, ErrorMessage, PageHeader, PageHeaderTitle } from 'frappe-ui'
 import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
@@ -85,8 +85,10 @@ async function submitContainer() {
 }
 
 // ---- start a visit ----
-const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', container: '', container_type: '', shipping_line: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
-const moves = (dir: string) => (dir === 'In' ? ['Export Drop', 'Empty Return'] : ['Import Pickup', 'Empty Pickup'])
+const visit = reactive({ open: false, lane: null as any, appointment: '', carrier: '', truck: '', driver: '', move_type: '', appointment_line: '', container: '', container_type: '', shipping_line: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
+const types = ref<any[]>([])
+watch(selected, async (t) => { if (t) { try { types.value = (await gateApi('transaction_types', { terminal: t })) as any[] } catch { types.value = [] } } }, { immediate: true })
+const moves = (dir: string) => types.value.filter((t) => t.direction === dir).map((t) => t.name)
 async function loadChoices() {
   if (!ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[] } catch {} }
   if (!lines.value.length) { try { lines.value = (await gateApi('shipping_lines')) as any[] } catch {} }
@@ -95,11 +97,13 @@ async function startVisit(lane: any) {
   await loadChoices()
   Object.assign(visit, { open: true, lane, appointment: '', carrier: '', truck: '', driver: '', move_type: moves(lane.direction)[0], container: '', container_type: '', booking_ref: '', seal_no: '', override: '', error: '', loading: false })
 }
-const queueFor = computed(() => queue.value.filter((a) => visit.lane && moves(visit.lane.direction).includes(a.move_type)))
+const lineFor = (a: any) => (a.lines || []).find((l: any) => l.status === 'Pending' && l.direction === visit.lane?.direction)
+const queueFor = computed(() => queue.value.filter((a) => visit.lane && (lineFor(a) || (!a.lines?.length && moves(visit.lane.direction).includes(a.move_type)))))
 function pickAppointment() {
   const a = queue.value.find((x) => x.name === visit.appointment)
   if (!a) return
-  Object.assign(visit, { carrier: a.carrier, move_type: a.move_type, container: a.container || '', booking_ref: a.booking_ref || '' })
+  const l = lineFor(a)
+  Object.assign(visit, { carrier: a.carrier, move_type: l?.move_type || a.move_type, container: l?.container || a.container || '', booking_ref: l?.booking_ref || a.booking_ref || '', appointment_line: l?.name || '' })
   // truck and driver fill in after the carrier's lists load
   setTimeout(() => Object.assign(visit, { truck: a.truck, driver: a.driver || visit.driver }), 400)
 }
@@ -109,7 +113,7 @@ async function submitVisit() {
   try {
     await act('start_visit', {
       lane: visit.lane.name, carrier: visit.carrier, truck: visit.truck, driver: visit.driver, move_type: visit.move_type,
-      appointment: visit.appointment, override: visit.override, container: visit.container, container_type: visit.container_type, shipping_line: visit.shipping_line, booking_ref: visit.booking_ref, seal_no: visit.seal_no,
+      appointment: visit.appointment, appointment_line: visit.appointment_line, override: visit.override, container: visit.container, container_type: visit.container_type, shipping_line: visit.shipping_line, booking_ref: visit.booking_ref, seal_no: visit.seal_no,
     })
     visit.open = false
     await refresh()

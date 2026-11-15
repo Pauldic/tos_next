@@ -22,7 +22,14 @@
   "late_arrival_minutes",
   "cb_company_overrides",
   "override_valid_hours",
-  "auto_create_gate_in_order"
+  "auto_create_gate_in_order",
+  "sb_profile",
+  "terminal_profile",
+  "cb_profile",
+  "has_marine_side",
+  "has_bonded_side",
+  "sb_tx",
+  "transaction_types"
  ],
  "fields": [
   {
@@ -141,10 +148,53 @@
    "label": "Create Yard Move Order After Gate In",
    "options": "Use company setting\nYes\nNo",
    "default": "Use company setting"
+  },
+  {
+   "fieldname": "sb_profile",
+   "fieldtype": "Section Break",
+   "label": "What this Terminal Does"
+  },
+  {
+   "fieldname": "terminal_profile",
+   "fieldtype": "Select",
+   "label": "Profile",
+   "options": "Bonded\nMarine\nBoth",
+   "default": "Both",
+   "description": "Sets the switches on the right when you change it. You can still change each switch afterwards."
+  },
+  {
+   "fieldname": "cb_profile",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "has_marine_side",
+   "fieldtype": "Check",
+   "label": "Quay, Berths and Vessels",
+   "default": "1",
+   "description": "Vessels, vessel visits and vessel planning. Off for a terminal that never works ships."
+  },
+  {
+   "fieldname": "has_bonded_side",
+   "fieldtype": "Check",
+   "label": "Bonded Storage",
+   "default": "1",
+   "description": "Customs, free days and storage billing."
+  },
+  {
+   "fieldname": "sb_tx",
+   "fieldtype": "Section Break",
+   "label": "Transactions Offered"
+  },
+  {
+   "fieldname": "transaction_types",
+   "fieldtype": "Table",
+   "label": "Transactions",
+   "options": "Terminal Transaction Type",
+   "description": "Leave empty to offer every active transaction. Add rows to offer only some, or untick Offered to hide one."
   }
  ],
  "links": [],
- "modified": "2026-11-12 08:00:00.000000",
+ "modified": "2026-11-15 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "Terminal",

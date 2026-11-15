@@ -1,0 +1,109 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-14 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "name": "Chassis Type",
+ "autoname": "field:chassis_name",
+ "naming_rule": "By fieldname",
+ "title_field": "chassis_name",
+ "track_changes": 1,
+ "fields": [
+  {
+   "fieldname": "chassis_name",
+   "fieldtype": "Data",
+   "label": "Chassis Type",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "max_container_length_ft",
+   "fieldtype": "Int",
+   "label": "Longest Container (ft)",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "No container longer than this fits."
+  },
+  {
+   "fieldname": "max_containers",
+   "fieldtype": "Int",
+   "label": "Most Containers at Once",
+   "reqd": 1,
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "max_total_length_ft",
+   "fieldtype": "Int",
+   "label": "Total Length (ft)",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Containers carried together must add up to no more than this. A combo chassis: 40."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1
+  },
+  {
+   "role": "Carrier Portal User",
+   "read": 1
+  }
+ ]
+}

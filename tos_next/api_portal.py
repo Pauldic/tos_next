@@ -13,11 +13,11 @@ from frappe import _
 from frappe.utils import add_days, get_time, getdate, now_datetime, nowdate
 
 from tos_next.api import _terminal
+from tos_next import transactions
+from tos_next.api_gate import attach_lines, clean_lines
 from tos_next import settings as tos_settings
 
 STAFF = {"System Manager", "Terminal Admin", "Appointment Planner"}
-IN_MOVES = ("Export Drop", "Empty Return")
-OUT_MOVES = ("Import Pickup", "Empty Pickup")
 
 
 def _carriers():
@@ -40,6 +40,14 @@ def _hhmm(t):
     return str(get_time(t))[:5]
 
 
+def _chassis_types():
+    return frappe.get_all("Chassis Type", filters={"is_active": 1}, fields=["name", "max_container_length_ft", "max_containers", "max_total_length_ft", "description"], order_by="max_container_length_ft, max_containers")
+
+
+def _lengths():
+    return sorted({int(x) for x in frappe.get_all("Container Type", filters={"is_active": 1}, pluck="length_ft") if x})
+
+
 @frappe.whitelist()
 def portal_context(terminal=None):
     cars = _carriers()
@@ -53,20 +61,26 @@ def portal_context(terminal=None):
         "early_minutes": early,
         "late_minutes": late,
         "carriers": frappe.get_all("Carrier", filters={"name": ["in", cars]}, fields=["name", "carrier_name", "is_blocked", "block_reason"]),
-        "trucks": frappe.get_all("Truck", filters={"carrier": ["in", cars], "is_blocked": 0}, fields=["name", "carrier", "max_container_length"], order_by="name"),
+        "trucks": frappe.get_all("Truck", filters={"carrier": ["in", cars], "is_blocked": 0}, fields=["name", "carrier", "chassis_type"], order_by="name"),
+        "chassis_types": _chassis_types(),
+        "transaction_types": transactions.offered(terminal),
+        "container_lengths": _lengths(),
         "drivers": frappe.get_all("Driver", filters={"carrier": ["in", cars], "is_blocked": 0}, fields=["name", "full_name", "carrier"], order_by="full_name"),
     }
 
 
 @frappe.whitelist()
-def portal_slots(date, move_type, terminal=None):
+def portal_slots(date, direction=None, move_type=None, terminal=None):
+    """Open slots for a day. direction is In (drop off only), Out (pick up only) or Both; the older move_type argument still works."""
     _carriers()
     terminal = _terminal(terminal)
-    direction = "In" if move_type in IN_MOVES else "Out"
+    if direction not in ("In", "Out", "Both"):
+        direction = transactions.direction(move_type) if move_type else "In"
     d = getdate(date)
     if d < getdate(nowdate()):
         return []
-    rows = frappe.get_all("Slot Capacity", filters={"terminal": terminal, "slot_date": d, "is_closed": 0, "move_types": ["in", ["All", f"Gate {direction}"]]},
+    scopes = ["All"] if direction == "Both" else ["All", f"Gate {direction}"]
+    rows = frappe.get_all("Slot Capacity", filters={"terminal": terminal, "slot_date": d, "is_closed": 0, "move_types": ["in", scopes]},
                           fields=["name", "start_time", "end_time", "capacity", "booked"], order_by="start_time asc")
     now_t = now_datetime().time()
     out = []
@@ -80,17 +94,22 @@ def portal_slots(date, move_type, terminal=None):
 @frappe.whitelist()
 def portal_appointments():
     cars = _carriers()
-    return frappe.get_all("Appointment", filters={"carrier": ["in", cars], "slot_date": [">=", add_days(nowdate(), -1)]},
-                          fields=["name", "slot_date", "start_time", "end_time", "status", "move_type", "direction", "carrier", "truck", "driver", "container", "booking_ref", "qr_token"],
+    rows = frappe.get_all("Appointment", filters={"carrier": ["in", cars], "slot_date": [">=", add_days(nowdate(), -1)]},
+                          fields=["name", "slot_date", "start_time", "end_time", "status", "move_type", "direction", "visit_type", "carrier", "truck", "driver", "container", "booking_ref", "qr_token"],
                           order_by="slot_date asc, start_time asc", limit_page_length=100)
+    return attach_lines(rows)
 
 
 @frappe.whitelist()
-def portal_book(slot, carrier, truck, driver, move_type, container=None, booking_ref=None):
+def portal_book(slot, carrier, truck, driver, lines=None, move_type=None, container=None, booking_ref=None):
+    """lines: the jobs of the visit, each {move_type, container?, container_length?, booking_ref?}. The single-job
+    arguments of the older screen still work."""
     _own(carrier)
-    doc = frappe.get_doc({"doctype": "Appointment", "slot": slot, "carrier": carrier, "truck": truck, "driver": driver, "move_type": move_type,
-                          "container": (container or "").strip().upper().replace(" ", "").replace("-", "") or None,
-                          "booking_ref": booking_ref or None, "terminal": frappe.db.get_value("Slot Capacity", slot, "terminal")}).insert(ignore_permissions=True)
+    jobs = clean_lines(lines)
+    if not jobs:
+        jobs = clean_lines([{"move_type": move_type, "container": container, "booking_ref": booking_ref}]) if move_type else []
+    doc = frappe.get_doc({"doctype": "Appointment", "slot": slot, "carrier": carrier, "truck": truck, "driver": driver, "lines": jobs,
+                          "terminal": frappe.db.get_value("Slot Capacity", slot, "terminal")}).insert(ignore_permissions=True)
     return {"name": doc.name, "status": doc.status, "qr_token": doc.qr_token}
 
 
@@ -107,7 +126,6 @@ def portal_cancel(name, reason):
 # Carriers may add and edit their own trucks and drivers. They may never touch block flags, move a record to
 # another carrier or rename a plate: those fields are simply not accepted here.
 TRUCK_TYPES = ("Tractor and Trailer", "Rigid", "Terminal Tractor")
-MAX_LENGTHS = ("20 ft only", "Up to 40 ft", "Up to 45 ft")
 
 
 @frappe.whitelist()
@@ -115,12 +133,13 @@ def portal_fleet():
     cars = _carriers()
     soon = add_days(nowdate(), 30)
     trucks = frappe.get_all("Truck", filters={"carrier": ["in", cars]}, order_by="plate_no",
-                            fields=["name", "carrier", "plate_no", "truck_type", "max_container_length", "rfid_tag", "is_blocked", "block_reason"])
+                            fields=["name", "carrier", "plate_no", "truck_type", "chassis_type", "rfid_tag", "is_blocked", "block_reason"])
     drivers = frappe.get_all("Driver", filters={"carrier": ["in", cars]}, order_by="full_name",
                              fields=["name", "carrier", "full_name", "phone", "licence_no", "licence_expiry", "is_blocked", "block_reason"])
     for d in drivers:
         d["licence_state"] = "expired" if getdate(d.licence_expiry) < getdate(nowdate()) else "soon" if getdate(d.licence_expiry) <= getdate(soon) else "ok"
-    return {"carriers": frappe.get_all("Carrier", filters={"name": ["in", cars]}, fields=["name", "carrier_name"]), "trucks": trucks, "drivers": drivers}
+    return {"carriers": frappe.get_all("Carrier", filters={"name": ["in", cars]}, fields=["name", "carrier_name"]), "trucks": trucks, "drivers": drivers,
+            "chassis_types": _chassis_types()}
 
 
 def _clean(v):
@@ -128,10 +147,12 @@ def _clean(v):
 
 
 @frappe.whitelist()
-def portal_save_truck(carrier, plate_no=None, truck_type="Tractor and Trailer", max_container_length="Up to 40 ft", rfid_tag=None, name=None):
+def portal_save_truck(carrier, chassis_type, plate_no=None, truck_type="Tractor and Trailer", rfid_tag=None, name=None):
     _own(carrier)
-    if truck_type not in TRUCK_TYPES or max_container_length not in MAX_LENGTHS:
-        frappe.throw(_("Choose a valid truck type and size."))
+    if truck_type not in TRUCK_TYPES:
+        frappe.throw(_("Choose a valid truck type."))
+    if not frappe.db.get_value("Chassis Type", chassis_type, "is_active"):
+        frappe.throw(_("Choose the chassis of the truck."))
     if name:
         doc = frappe.get_doc("Truck", name)
         _own(doc.carrier)
@@ -144,7 +165,7 @@ def portal_save_truck(carrier, plate_no=None, truck_type="Tractor and Trailer", 
         if frappe.db.exists("Truck", plate):
             frappe.throw(_("This plate number is already registered. Contact the terminal if the truck is yours."))
         doc = frappe.get_doc({"doctype": "Truck", "plate_no": plate, "carrier": carrier})
-    doc.truck_type, doc.max_container_length, doc.rfid_tag = truck_type, max_container_length, _clean(rfid_tag)
+    doc.truck_type, doc.chassis_type, doc.rfid_tag = truck_type, chassis_type, _clean(rfid_tag)
     doc.save(ignore_permissions=True) if name else doc.insert(ignore_permissions=True)
     return {"name": doc.name}
 

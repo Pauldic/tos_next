@@ -46,6 +46,10 @@ def _ensure(doctype, name, **fields):
     return doc.name
 
 
+def _chassis_type():
+    return "45 ft" if frappe.db.exists("Chassis Type", "45 ft") else frappe.db.get_value("Chassis Type", {"is_active": 1}, "name")
+
+
 def _letters(rnd, n):
     return "".join(rnd.choice("ABCDEFGHJKLMNPRSTUVWXYZ") for _ in range(n))
 
@@ -110,7 +114,7 @@ def seed(terminal=None, blocks="A,B,C,D", bays=10, rows=6, containers=120, seed_
         for k in range(2):
             plate = f"DEMO {ci}{k} {_letters(rnd, 2)}"
             if not frappe.db.exists("Truck", plate):
-                _ensure("Truck", plate, plate_no=plate, carrier=c, max_container_length="Up to 45 ft")
+                _ensure("Truck", plate, plate_no=plate, carrier=c, chassis_type=_chassis_type())
             lic = f"DEMO-LIC-{ci}{k}"
             if not frappe.db.exists("Driver", {"licence_no": lic}):
                 frappe.get_doc({
@@ -162,8 +166,8 @@ def seed(terminal=None, blocks="A,B,C,D", bays=10, rows=6, containers=120, seed_
         truck = frappe.get_all("Truck", filters={"plate_no": ["like", f"DEMO {i}%"]}, fields=["name", "carrier"], limit=1)
         driver = frappe.get_all("Driver", filters={"carrier": CARRIERS[i]}, pluck="name", limit=1)
         if truck and driver and not frappe.db.exists("Appointment", {"slot": slot, "truck": truck[0].name}):
-            frappe.get_doc({"doctype": "Appointment", "slot": slot, "move_type": "Export Drop", "carrier": truck[0].carrier,
-                            "truck": truck[0].name, "driver": driver[0], "booking_ref": f"DEMO-BK-{i + 1}"}).insert(ignore_permissions=True)
+            frappe.get_doc({"doctype": "Appointment", "slot": slot, "carrier": truck[0].carrier, "truck": truck[0].name, "driver": driver[0],
+                            "lines": [{"move_type": "Receive Export", "container_length": 40, "booking_ref": f"DEMO-BK-{i + 1}"}]}).insert(ignore_permissions=True)
             booked += 1
 
     frappe.db.commit()
@@ -249,7 +253,7 @@ def run_checks(terminal=None):
     def new_visit(override=None):
         return frappe.get_doc({
             "doctype": "Gate Transaction", "lane": lane, "carrier": truck.carrier, "truck": truck.name, "driver": driver,
-            "move_type": "Export Drop", "booking_ref": f"TEST-{tag}", "container_no": no, "container_type": "45G1",
+            "move_type": "Receive Export", "booking_ref": f"TEST-{tag}", "container_no": no, "container_type": "45G1",
             "shipping_line": "NWD", "override": override,
         }).insert()
 

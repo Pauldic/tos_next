@@ -28,13 +28,14 @@ const hazards = computed(() => (c.value?.hazards || []).map((x: any) => `Class $
 const groups = computed(() => {
   const x = c.value; if (!x) return []
   const stows = [1, 2, 3, 4, 5].map((i) => x['special_stow_' + i]).filter(Boolean).join(', ')
-  return [
+  const all = [
     ['Identity', [['Container', x.name], ['ISO / type', x.container_type], ['Category', x.category], ['F/E', x.full_empty], ['Group code', x.group_code], ['Carrier line', x.shipping_line], ['Line', x.line], ['Terminal line', x.terminal_line], ['Consignee', x.consignee], ['Remarks', x.remarks]]],
     ['Location', [['Transit state', x.transit_state], ['Status', x.status], ['Position', x.position], ['Planned position', x.planned_position], ['Time in', dt(x.arrived_on)], ['Dwell days', x.dwell_days]]],
     ['Cargo', [['Seal', x.seal_no], ['Seal verified', x.seal_verified ? `Yes${x.seal_verified_by ? ' by ' + x.seal_verified_by : ''}` : 'No'], ['Gross weight (kg)', x.gross_weight_kg], ['Reefer temp (°C)', x.reefer_set_temp_c], ['Reefer plugged', x.reefer_plugged ? 'Yes' : ''], ['Hazard (IMDG)', hazards.value.join('; ')], ['Special stow', stows]]],
     ['Vessels', [['Inbound', [x.ib_vessel_name, x.ib_vessel_voyage].filter(Boolean).join(' · ')], ['Inbound class', x.ib_vessel_class], ['Outbound', [x.ob_vessel_name, x.ob_vessel_voyage].filter(Boolean).join(' · ')], ['Outbound class', x.ob_vessel_class], ['POL', x.pol], ['POD', x.pod], ['Destination', x.destination], ['Place of delivery', x.place_of_delivery]]],
     ['Commercial and billing', [['B/L reference', x.bill_of_lading], ['Booking', x.booking_ref], ['Free days until', x.free_days_until], ['Storage paid', x.storage_paid_date], ['Reefer storage paid', x.reefer_storage_paid], ['Line storage paid', x.line_storage_paid]]],
   ] as [string, [string, any][]][]
+  return x.terminal_has_marine === 0 ? all.filter(([t]) => t !== 'Vessels') : all
 })
 </script>
 

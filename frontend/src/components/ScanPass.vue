@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Badge, Button, ErrorMessage } from 'frappe-ui'
 import Modal from './Modal.vue'
 import Field from './Field.vue'
+import ContainerPick from './ContainerPick.vue'
 import { act, gateApi } from '../api'
 
 const props = defineProps<{ open: boolean; terminal: string; lanes: any[]; overrides: any[] }>()
@@ -18,6 +19,8 @@ const override = ref('')
 const newNo = ref('')
 const newType = ref('')
 const newLine = ref('')
+const lineName = ref('')
+const pickContainer = ref('')
 const lines = ref<any[]>([])
 const ctypes = ref<any[]>([])
 const input = ref<HTMLInputElement>()
@@ -29,7 +32,7 @@ let stream: MediaStream | null = null
 let timer = 0
 
 function reset() {
-  code.value = ''; result.value = null; error.value = ''; lane.value = ''; override.value = ''; newNo.value = ''; newType.value = ''; newLine.value = ''; stopCam(); camError.value = ''
+  code.value = ''; result.value = null; error.value = ''; lane.value = ''; override.value = ''; newNo.value = ''; newType.value = ''; newLine.value = ''; lineName.value = ''; pickContainer.value = ''; stopCam(); camError.value = ''
 }
 watch(() => props.open, async (o) => { if (o) { reset(); await nextTick(); input.value?.focus() } else stopCam() })
 onBeforeUnmount(stopCam)
@@ -39,8 +42,9 @@ async function lookup(text = code.value) {
   loading.value = true; error.value = ''; result.value = null
   try {
     result.value = await gateApi('scan_pass', { code: text, terminal: props.terminal })
+    lineName.value = result.value.pending?.[0] || ''
     lane.value = openLanes.value[0]?.name || ''
-    if (result.value.direction === 'In' && !result.value.container && !ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[]; lines.value = (await gateApi('shipping_lines')) as any[] } catch {} }
+    if (isNew.value && !ctypes.value.length) { try { ctypes.value = (await gateApi('container_types')) as any[]; lines.value = (await gateApi('shipping_lines')) as any[] } catch {} }
     override.value = matching.value[0]?.name || ''
   } catch (e: any) {
     error.value = e.message
@@ -49,18 +53,23 @@ async function lookup(text = code.value) {
   } finally { loading.value = false }
 }
 
-const openLanes = computed(() => props.lanes.filter((l) => result.value && l.direction === result.value.direction && l.status === 'Open'))
+const line = computed(() => result.value?.lines?.find((l: any) => l.name === lineName.value) || null)
+const lineDir = computed(() => line.value?.direction || 'In')
+const pendingLines = computed(() => (result.value?.lines || []).filter((l: any) => l.status === 'Pending'))
+watch(lineName, () => { pickContainer.value = ''; newNo.value = ''; newType.value = ''; lane.value = openLanes.value[0]?.name || '' })
+const openLanes = computed(() => props.lanes.filter((l) => result.value && l.direction === lineDir.value && l.status === 'Open'))
 const matching = computed(() => props.overrides.filter((o) => result.value && o.override_type === 'Outside Slot Window' && (o.appointment === result.value.appointment)))
 const blocked = computed(() => !!result.value?.blockers?.length)
 const needsOverride = computed(() => !!result.value?.needs_override)
-const isNew = computed(() => result.value?.direction === 'In' && !result.value?.container)
-const canStart = computed(() => result.value && !blocked.value && lane.value && (!needsOverride.value || override.value) && (!isNew.value || newType.value))
+const isNew = computed(() => !!line.value && lineDir.value === 'In' && !line.value.container)
+const needsPick = computed(() => !!line.value && lineDir.value === 'Out' && !line.value.container)
+const canStart = computed(() => result.value && !blocked.value && lane.value && (!needsOverride.value || override.value) && line.value && (!isNew.value || newType.value) && (!needsPick.value || pickContainer.value))
 
 async function start() {
   const r = result.value
   starting.value = true; error.value = ''
   try {
-    await act('start_visit', { lane: lane.value, carrier: r.carrier, truck: r.truck, driver: r.driver, move_type: r.move_type, appointment: r.appointment, override: needsOverride.value ? override.value : '', container: r.container || newNo.value, container_type: newType.value, shipping_line: newLine.value, booking_ref: r.booking_ref })
+    await act('start_visit', { lane: lane.value, carrier: r.carrier, truck: r.truck, driver: r.driver, move_type: line.value.move_type, appointment: r.appointment, appointment_line: lineName.value, override: needsOverride.value ? override.value : '', container: line.value.container || pickContainer.value || newNo.value, container_type: newType.value, shipping_line: newLine.value, booking_ref: line.value.booking_ref || r.booking_ref })
     emit('started'); emit('close')
   } catch (e: any) { error.value = e.message } finally { starting.value = false }
 }
@@ -143,10 +152,10 @@ const windowText = computed(() => {
     <template v-else>
       <div class="rounded-5 border border-outline-gray-1 p-3">
         <div class="flex items-start justify-between gap-2">
-          <div><p class="text-base-medium text-ink-gray-9">{{ result.truck }} · {{ result.move_type }}</p><p class="text-sm text-ink-gray-5">{{ result.carrier_name || result.carrier }} · {{ result.driver_name || result.driver }}</p></div>
-          <Badge theme="blue" :label="'Gate ' + result.direction" />
+          <div><p class="text-base-medium text-ink-gray-9">{{ result.truck }} · {{ result.visit_type || result.move_type }}</p><p class="text-sm text-ink-gray-5">{{ result.carrier_name || result.carrier }} · {{ result.driver_name || result.driver }}</p></div>
+          <Badge theme="blue" :label="result.direction === 'Both' ? 'Gate In and Out' : 'Gate ' + result.direction" />
         </div>
-        <p class="mt-2 text-sm text-ink-gray-6">{{ result.appointment }} · slot {{ result.slot_start }}–{{ result.slot_end }}<template v-if="result.container"> · {{ result.container }}</template><template v-if="result.booking_ref"> · {{ result.booking_ref }}</template></p>
+        <p class="mt-2 text-sm text-ink-gray-6">{{ result.appointment }} · slot {{ result.slot_start }}–{{ result.slot_end }}</p>
         <p :class="['mt-2 text-sm font-medium', result.window.state === 'ok' ? 'text-ink-green-3' : 'text-ink-amber-3']">{{ windowText }}</p>
       </div>
 
@@ -156,10 +165,21 @@ const windowText = computed(() => {
       </ul>
 
       <template v-else>
+        <Field label="Which job is the truck here for?" :hint="pendingLines.length > 1 ? 'A truck that receives and delivers is let through one job at a time.' : undefined">
+          <div class="space-y-1">
+            <label v-for="l in result.lines" :key="l.name" :class="['flex items-center gap-2 rounded-5 border p-2 text-sm', l.status !== 'Pending' ? 'opacity-50' : '', lineName === l.name ? 'border-outline-blue-2 bg-surface-blue-1' : 'border-outline-gray-2']">
+              <input v-model="lineName" type="radio" :value="l.name" :disabled="l.status !== 'Pending'" />
+              <span class="flex-1">{{ l.move_type }} · {{ l.container_length }} ft<template v-if="l.container"> · {{ l.container }}</template><template v-if="l.booking_ref"> · {{ l.booking_ref }}</template></span>
+              <Badge v-if="l.status !== 'Pending'" theme="gray" :label="l.status" />
+              <span v-else class="text-xs text-ink-gray-5">Gate {{ l.direction }}</span>
+            </label>
+          </div>
+        </Field>
         <Field label="Lane">
           <select v-model="lane" class="tos-input"><option v-for="l in openLanes" :key="l.name" :value="l.name">Lane {{ l.lane_code }}</option></select>
-          <p v-if="!openLanes.length" class="mt-1 text-sm text-ink-amber-3">No open Gate {{ result.direction }} lane right now.</p>
+          <p v-if="!openLanes.length" class="mt-1 text-sm text-ink-amber-3">No open Gate {{ lineDir }} lane right now.</p>
         </Field>
+        <Field v-if="needsPick" label="Container to pick up" :hint="'The appointment says ' + (line?.container_length || '') + ' ft. Choose the container the truck is collecting; it must be the same size.'"><ContainerPick v-model="pickContainer" /></Field>
         <template v-if="isNew">
           <Field label="Container number (optional now)" hint="The truck's container number, if you can read it. If you leave it empty, record it at the portal read step."><input v-model="newNo" class="tos-input font-mono" autocomplete="off" /></Field>
           <Field label="Shipping line" hint="Its name is printed on the container in the 3D yard."><select v-model="newLine" class="tos-input"><option value="">None / not known</option><option v-for="l in lines" :key="l.name" :value="l.name">{{ l.line_name }}</option></select></Field>

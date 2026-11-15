@@ -1,0 +1,146 @@
+{
+ "actions": [],
+ "creation": "2026-11-15 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-15 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "name": "Transaction Type",
+ "autoname": "field:transaction_name",
+ "naming_rule": "By fieldname",
+ "title_field": "transaction_name",
+ "track_changes": 1,
+ "fields": [
+  {
+   "fieldname": "transaction_name",
+   "fieldtype": "Data",
+   "label": "Transaction",
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "The name your customers use, for example Receive Import or Deliver Empty."
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Active",
+   "default": "1",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "sort_order",
+   "fieldtype": "Int",
+   "label": "Order on Screens",
+   "default": "100"
+  },
+  {
+   "fieldname": "cb1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "direction",
+   "fieldtype": "Select",
+   "label": "Gate",
+   "options": "In\nOut",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Receive is Gate In (the container comes into the terminal). Deliver is Gate Out (it leaves)."
+  },
+  {
+   "fieldname": "cargo",
+   "fieldtype": "Select",
+   "label": "Container",
+   "options": "Loaded\nEmpty",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "Gate Out: the container must be loaded or empty to match. Gate In: how it is recorded on arrival."
+  },
+  {
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "label": "Category on Arrival",
+   "options": "\nImport\nExport\nTransshipment\nStorage",
+   "depends_on": "eval:doc.direction=='In'",
+   "description": "Set on the container when it is received."
+  },
+  {
+   "fieldname": "counterparty",
+   "fieldtype": "Select",
+   "label": "From / To",
+   "options": "\nCustomer\nMarine Terminal\nCustomer or Marine Terminal",
+   "in_list_view": 1,
+   "description": "Where the container comes from (Receive) or goes to (Deliver). Shown to the clerk and kept for reports and billing."
+  },
+  {
+   "fieldname": "sb_rules",
+   "fieldtype": "Section Break",
+   "label": "Rules"
+  },
+  {
+   "fieldname": "requires_container",
+   "fieldtype": "Check",
+   "label": "Container Must Be Named on the Appointment"
+  },
+  {
+   "fieldname": "requires_booking",
+   "fieldtype": "Check",
+   "label": "Booking Reference Required"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  }
+ ],
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "Terminal Admin",
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "export": 1,
+   "report": 1
+  },
+  {
+   "role": "Appointment Planner",
+   "read": 1
+  },
+  {
+   "role": "Gate Supervisor",
+   "read": 1
+  },
+  {
+   "role": "Gate Clerk",
+   "read": 1
+  },
+  {
+   "role": "Yard Planner",
+   "read": 1
+  },
+  {
+   "role": "Equipment Operator",
+   "read": 1
+  },
+  {
+   "role": "Carrier Portal User",
+   "read": 1
+  }
+ ]
+}

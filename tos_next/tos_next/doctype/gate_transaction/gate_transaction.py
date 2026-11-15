@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, date_diff, get_datetime, get_time, now_datetime, time_diff_in_seconds
 
-from tos_next import events, yard
+from tos_next import events, transactions, yard
 from tos_next.settings import auto_create_order, company, gate_window
 from tos_next.tos_next.doctype.appointment.appointment import slot_window
 from tos_next.tos_next.doctype.appointment_override.appointment_override import get_valid_override, mark_used
@@ -16,7 +16,6 @@ from tos_next.realtime import publish
 IN_STEPS = ["Arrival", "OCR and RFID", "Documents", "Damage Scan", "Admitted"]
 OUT_STEPS = ["Arrival", "OCR and RFID", "Seal Check", "Documents", "Released"]
 SUPERVISOR_ROLES = {"Gate Supervisor", "Terminal Admin", "System Manager"}
-IN_MOVES = ("Export Drop", "Empty Return")
 
 
 class GateTransaction(Document):
@@ -55,10 +54,9 @@ class GateTransaction(Document):
         appt = None
         if self.appointment:
             appt = frappe.get_doc("Appointment", self.appointment)
-            if appt.status not in ("Booked", "Late"):
+            if appt.status not in ("Booked", "Late", "In Progress"):
                 frappe.throw(_("Appointment {0} is {1}.").format(appt.name, appt.status))
-            if appt.direction != self.direction:
-                frappe.throw(_("Appointment {0} is for Gate {1}, but this is a Gate {2} lane.").format(appt.name, appt.direction, self.direction))
+            line = self.pick_line(appt)
             if (appt.carrier, appt.truck, appt.driver) != (self.carrier, self.truck, self.driver):
                 needs.append("Details Changed")
             start, end = slot_window(frappe.get_cached_doc("Slot Capacity", appt.slot))
@@ -66,9 +64,11 @@ class GateTransaction(Document):
             early, late = gate_window(self.terminal)
             if now < add_to_date(start, minutes=-early) or now > add_to_date(end, minutes=late):
                 needs.append("Outside Slot Window")
-            self.move_type = appt.move_type
-            self.container = self.container or appt.container
-            self.booking_ref = self.booking_ref or appt.booking_ref
+            self.move_type = line.move_type
+            self.container = self.container or line.container
+            self.booking_ref = self.booking_ref or line.booking_ref
+            self.flags.appointment_line = line.name
+            self.flags.expected_length = line.container_length
         elif term.require_appointment:
             needs.append("No Appointment")
 
@@ -81,27 +81,67 @@ class GateTransaction(Document):
         elif self.override:
             frappe.throw(_("An override was given but this visit does not need one."))
 
+    def pick_line(self, appt):
+        """The job of the appointment this visit does. The clerk can name it; otherwise it is the first pending job
+        that belongs in this lane."""
+        want_in = self.direction == "In"
+        named = self.flags.get("appointment_line")
+        if named:
+            line = next((l for l in appt.lines if l.name == named), None)
+            if not line:
+                frappe.throw(_("That job is not on appointment {0}.").format(appt.name))
+        else:
+            line = next((l for l in appt.lines if l.status == "Pending" and transactions.is_in(l.move_type) == want_in), None)
+            if not line:
+                frappe.throw(_("Appointment {0} has no job left for a Gate {1} lane.").format(appt.name, self.direction))
+        if line.status != "Pending":
+            frappe.throw(_("That job is already {0}.").format(line.status.lower()))
+        if transactions.is_in(line.move_type) != want_in:
+            frappe.throw(_("{0} cannot be done in a Gate {1} lane.").format(line.move_type, self.direction))
+        return line
+
+    def _line(self):
+        if not self.appointment:
+            return None
+        return frappe.db.get_value("Appointment Line", {"parent": self.appointment, "gate_transaction": self.name}, ["name", "container_length"], as_dict=True)
+
+    def check_size(self, expected=None):
+        """The container at the lane must be the size the appointment said, and it must fit the truck's chassis."""
+        if self.container:
+            length = frappe.db.get_value("Container", self.container, "length_ft")
+        elif self.container_type:
+            length = frappe.db.get_value("Container Type", self.container_type, "length_ft")
+        else:
+            return
+        if not length:
+            return
+        if expected is None:
+            line = self._line()
+            expected = line.container_length if line else None
+        if expected and int(expected) != int(length):
+            frappe.throw(_("The appointment is for a {0} ft container, but this one is {1} ft.").format(expected, length))
+        frappe.get_doc("Truck", self.truck).check_load([length])
+
     def check_direction_and_container(self):
-        if (self.move_type in IN_MOVES) != (self.direction == "In"):
-            frappe.throw(_("{0} cannot be done in a Gate {1} lane.").format(self.move_type, self.direction))
+        tt = transactions.get(self.move_type)
+        if tt.direction != self.direction:
+            frappe.throw(_("{0} is a Gate {1} transaction and cannot be done in a Gate {2} lane.").format(self.move_type, tt.direction, self.direction))
+        transactions.assert_offered(self.move_type, self.terminal)
         if self.container:
             c = frappe.get_doc("Container", self.container)
-            if self.direction == "Out":
-                if c.status != "On Terminal":
-                    frappe.throw(_("{0} is not on the terminal, so it cannot leave. Check the container number.").format(c.name))
-                if c.is_on_hold:
-                    frappe.throw(_("{0} is on hold (see the Container Hold list). A supervisor must release the hold first.").format(c.name))
+            transactions.check_container_fits(tt, c)
             self.container_type = self.container_type or c.container_type
-            if not frappe.get_doc("Truck", self.truck).can_carry(c.length_ft or 40):
-                frappe.throw(_("Truck {0} cannot carry a {1} ft container.").format(self.truck, c.length_ft))
+            self.check_size(self.flags.get("expected_length"))
         elif self.direction == "Out":
             frappe.throw(_("A container is required for Gate Out."))
-        if self.move_type == "Export Drop" and not self.booking_ref:
-            frappe.throw(_("Booking reference is required for an Export Drop."))
+        if tt.requires_booking and not self.booking_ref:
+            frappe.throw(_("A booking reference is required for {0}.").format(self.move_type))
 
     def after_insert(self):
         frappe.db.set_value("Gate Lane", self.lane, {"status": "Busy", "current_transaction": self.name})
         if self.appointment:
+            if self.flags.get("appointment_line"):
+                frappe.db.set_value("Appointment Line", self.flags.appointment_line, "gate_transaction", self.name)
             frappe.db.set_value("Appointment", self.appointment, {"status": "Arrived", "arrived_at": now_datetime()})
             publish("appointment_status", {"appointment": self.appointment, "status": "Arrived"}, self.terminal)
         if self.flags.get("override_to_use"):
@@ -144,6 +184,8 @@ class GateTransaction(Document):
             frappe.throw(_("Describe the damage before passing this step."))
         if step == "Seal Check" and not self.seal_intact:
             frappe.throw(_("The seal is not intact. Fail the step or ask a supervisor to waive it."))
+        if step in ("OCR and RFID", "Damage Scan", "Admitted") and self.appointment:
+            self.check_size()
         if step in ("Damage Scan", "Admitted") and self.direction == "In":
             if not self.container and not (self.container_no and self.container_type):
                 frappe.throw(_("A new container needs its number and its type before it can be admitted. Press Container details on the lane card to add them."))
@@ -249,8 +291,10 @@ class GateTransaction(Document):
         self.save()
         self._free_lane()
         if self.appointment:
-            # the appointment stays Booked so the carrier can come back inside its slot
-            frappe.db.set_value("Appointment", self.appointment, "status", "Booked")
+            # the job goes back to pending and the appointment stays open, so the carrier can come back inside its slot
+            frappe.db.set_value("Appointment Line", {"parent": self.appointment, "gate_transaction": self.name}, "gate_transaction", None)
+            done = frappe.db.count("Appointment Line", {"parent": self.appointment, "status": "Done"})
+            frappe.db.set_value("Appointment", self.appointment, "status", "In Progress" if done else "Booked")
         self.add_comment("Info", _("Rejected by {0}: {1}").format(frappe.session.user, reason))
         self.announce()
 
@@ -265,8 +309,16 @@ class GateTransaction(Document):
         self.save()
         self._free_lane()
         if self.appointment:
-            frappe.db.set_value("Appointment", self.appointment, {"status": "Completed", "completed_at": self.exited_at})
-            publish("appointment_status", {"appointment": self.appointment, "status": "Completed"}, self.terminal)
+            line = self._line()
+            if line:
+                frappe.db.set_value("Appointment Line", line.name, {"status": "Done", "done_on": self.exited_at, "container": container})
+            left = frappe.db.count("Appointment Line", {"parent": self.appointment, "status": "Pending"})
+            if left:
+                frappe.db.set_value("Appointment", self.appointment, "status", "In Progress")
+                publish("appointment_status", {"appointment": self.appointment, "status": "In Progress"}, self.terminal)
+            else:
+                frappe.db.set_value("Appointment", self.appointment, {"status": "Completed", "completed_at": self.exited_at})
+                publish("appointment_status", {"appointment": self.appointment, "status": "Completed"}, self.terminal)
         self.announce()
         if self.direction == "In" and auto_create_order(self.terminal):
             self.create_yard_order()
@@ -294,18 +346,19 @@ class GateTransaction(Document):
             self.add_comment("Info", _("The move order could not be created automatically: {0}. A planner can create it by hand.").format(e))
 
     def _admit(self):
+        tt = transactions.get(self.move_type)
         if self.container:
             c = frappe.get_doc("Container", self.container)
             if c.status == "On Terminal":
                 frappe.throw(_("{0} is already on the terminal, so it cannot be admitted again. For a Gate In, give a container that is not in the yard yet, or type a new number.").format(c.name))
+            c.category, c.full_empty = transactions.arrival_state(tt, c)
         else:
             if not (self.container_no and self.container_type):
                 frappe.throw(_("A new container needs its number and its type. Press Container details on the lane card to add them."))
             c = frappe.get_doc({
                 "doctype": "Container", "container_no": self.container_no, "terminal": self.terminal,
                 "container_type": self.container_type, "shipping_line": self.shipping_line,
-                "category": "Export" if self.move_type == "Export Drop" else "Storage",
-                "full_empty": "FCL" if self.move_type == "Export Drop" else "MT",
+                "category": transactions.arrival_state(tt)[0], "full_empty": transactions.arrival_state(tt)[1],
             })
             c.insert(ignore_permissions=True)
         c.status = "On Terminal"

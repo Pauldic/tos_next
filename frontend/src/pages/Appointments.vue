@@ -3,7 +3,9 @@ import { computed, reactive, ref, watch } from 'vue'
 import { Badge, Button, ErrorMessage, PageHeader, PageHeaderTitle } from 'frappe-ui'
 import Modal from '../components/Modal.vue'
 import Field from '../components/Field.vue'
-import ContainerPick from '../components/ContainerPick.vue'
+import JobsEditor from '../components/JobsEditor.vue'
+import SlotManager from '../components/SlotManager.vue'
+import { blankJob, firstOf, type Job, type TxType } from '../jobs'
 import PartyPicker from '../components/PartyPicker.vue'
 import { act, gateApi, tos } from '../api'
 import { useTerminal } from '../composables/useTerminal'
@@ -12,7 +14,7 @@ import { usePolling } from '../composables/usePolling'
 const { selected, current } = useTerminal()
 const iso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
 const date = ref(iso(new Date()))
-const tab = ref<'slots' | 'overrides'>('slots')
+const tab = ref<'slots' | 'manage' | 'overrides'>('slots')
 const slots = ref<any[]>([])
 const appts = ref<any[]>([])
 const pending = ref<any[]>([])
@@ -50,18 +52,24 @@ const slotObj = computed(() => slots.value.find((s) => s.name === activeSlot.val
 const totals = computed(() => ({ booked: slots.value.reduce((n, s) => n + Number(s.booked || 0), 0), cap: slots.value.reduce((n, s) => n + Number(s.capacity || 0), 0) }))
 
 // ---- book ----
-const ALL_MOVES = ['Export Drop', 'Empty Return', 'Import Pickup', 'Empty Pickup']
-const book = reactive({ open: false, slot: '', carrier: '', truck: '', driver: '', move_type: ALL_MOVES[0], container: '', booking_ref: '', override: '', error: '', loading: false })
+const book = reactive({ open: false, slot: '', carrier: '', truck: '', driver: '', override: '', error: '', loading: false })
+const jobs = ref<Job[]>([])
+const types = ref<TxType[]>([])
+const lk = ref<any>({ trucks: [], chassis_types: [], container_lengths: [] })
 const overrides = ref<any[]>([])
+const chassis = computed(() => lk.value.chassis_types?.find((c: any) => c.name === lk.value.trucks?.find((t: any) => t.name === book.truck)?.chassis_type) || null)
+watch(() => book.carrier, async (c) => { try { lk.value = await gateApi('lookups', { carrier: c }) } catch { /* the picker shows its own error */ } })
 async function openBook() {
-  Object.assign(book, { open: true, slot: activeSlot.value, carrier: '', truck: '', driver: '', move_type: ALL_MOVES[0], container: '', booking_ref: '', override: '', error: '', loading: false })
+  Object.assign(book, { open: true, slot: activeSlot.value, carrier: '', truck: '', driver: '', override: '', error: '', loading: false })
+  try { types.value = (await gateApi('transaction_types', { terminal: selected.value })) as TxType[] } catch {}
+  jobs.value = [blankJob(firstOf(types.value, 'In'))]
+  try { lk.value = await gateApi('lookups', {}) } catch {}
   overrides.value = (await gateApi('approved_overrides', { terminal: selected.value })) as any[]
 }
-
 async function submitBook() {
   book.loading = true; book.error = ''
   try {
-    await act('book_appointment', { slot: book.slot, carrier: book.carrier, truck: book.truck, driver: book.driver, move_type: book.move_type, container: book.container, booking_ref: book.booking_ref, override: book.override })
+    await act('book_appointment', { slot: book.slot, carrier: book.carrier, truck: book.truck, driver: book.driver, lines: jobs.value.map((j) => ({ ...j, container_length: j.container_length || '' })), override: book.override })
     book.open = false
     await refresh()
   } catch (e: any) { book.error = e.message } finally { book.loading = false }
@@ -112,7 +120,7 @@ async function submitDecide() {
   <div class="mx-auto max-w-[1300px] space-y-5 px-4 pb-10 pt-6 sm:px-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div class="inline-flex rounded-5 border border-outline-gray-2 p-0.5" role="tablist">
-        <button v-for="t in [{ k: 'slots', l: 'Slots' }, { k: 'overrides', l: 'Overrides' }]" :key="t.k" role="tab" :aria-selected="tab === t.k" :class="['rounded-4 px-3 py-1 text-sm', tab === t.k ? 'bg-surface-gray-3 text-ink-gray-9' : 'text-ink-gray-6']" @click="tab = t.k as any">
+        <button v-for="t in [{ k: 'slots', l: 'Slots' }, { k: 'manage', l: 'Manage slots' }, { k: 'overrides', l: 'Overrides' }]" :key="t.k" role="tab" :aria-selected="tab === t.k" :class="['rounded-4 px-3 py-1 text-sm', tab === t.k ? 'bg-surface-gray-3 text-ink-gray-9' : 'text-ink-gray-6']" @click="tab = t.k as any">
           {{ t.l }}<span v-if="t.k === 'overrides' && pending.length" class="ml-1.5 rounded-full bg-surface-amber-2 px-1.5 text-xs">{{ pending.length }}</span>
         </button>
       </div>
@@ -148,10 +156,11 @@ async function submitDecide() {
         </header>
         <ul class="divide-y divide-outline-gray-1">
           <li v-for="a in slotAppts" :key="a.name" class="flex items-center gap-3 px-4 py-2.5">
-            <span :class="[a.direction === 'In' ? 'lucide-log-in' : 'lucide-log-out', 'size-4 shrink-0 text-ink-gray-5']" aria-hidden="true" />
+            <span :class="[a.direction === 'In' ? 'lucide-log-in' : a.direction === 'Both' ? 'lucide-arrow-left-right' : 'lucide-log-out', 'size-4 shrink-0 text-ink-gray-5']" aria-hidden="true" />
             <div class="min-w-0 flex-1">
-              <p class="truncate text-base-medium text-ink-gray-8">{{ a.truck }} <span class="text-ink-gray-5">· {{ a.move_type }}</span></p>
-              <p class="truncate text-sm text-ink-gray-5">{{ a.name }} · {{ a.carrier }}<template v-if="a.container"> · {{ a.container }}</template><template v-if="a.override"> · override {{ a.override }}</template></p>
+              <p class="truncate text-base-medium text-ink-gray-8">{{ a.truck }} <span class="text-ink-gray-5">· {{ a.visit_type || a.move_type }}</span></p>
+              <p class="truncate text-sm text-ink-gray-5">{{ a.name }} · {{ a.carrier }}<template v-if="a.override"> · override {{ a.override }}</template></p>
+              <p class="truncate text-xs text-ink-gray-5"><template v-for="(l, i) in a.lines" :key="l.name"><template v-if="i"> | </template>{{ l.move_type }} {{ l.container_length }} ft<template v-if="l.container"> {{ l.container }}</template><template v-if="l.status !== 'Pending'"> ({{ l.status }})</template></template></p>
             </div>
             <Badge :theme="statusTheme(a.status)" :label="a.status" />
             <Button v-if="['Booked', 'Late'].includes(a.status)" variant="ghost" icon="lucide-x" aria-label="Cancel appointment" tooltip="Cancel" @click="Object.assign(cancel, { open: true, name: a.name, reason: '', error: '' })" />
@@ -160,6 +169,8 @@ async function submitDecide() {
         </ul>
       </section>
     </div>
+
+    <SlotManager v-else-if="tab === 'manage'" :terminal="selected" :date="date" @changed="refresh" />
 
     <section v-else class="rounded-6 border border-outline-gray-1 bg-surface-white shadow-sm">
       <header class="flex items-center justify-between border-b border-outline-gray-1 px-4 py-3">
@@ -186,14 +197,10 @@ async function submitDecide() {
   </div>
 
   <Modal :open="book.open" title="Book appointment" confirm-label="Book" :loading="book.loading" :error="book.error" wide @close="book.open = false" @confirm="submitBook">
-    <Field label="Slot"><select v-model="book.slot" class="tos-input"><option v-for="s in slots" :key="s.name" :value="s.name">{{ time(s.start_time) }}–{{ time(s.end_time) }} ({{ s.capacity - s.booked }} left)</option></select></Field>
+    <Field label="Slot"><select v-model="book.slot" class="tos-input"><option v-for="s in slots" :key="s.name" :value="s.name">{{ time(s.start_time) }}–{{ time(s.end_time) }} ({{ s.capacity - s.booked }} left) {{ s.move_types !== 'All' ? '· ' + s.move_types + ' only' : '' }}</option></select></Field>
     <PartyPicker v-model:carrier="book.carrier" v-model:truck="book.truck" v-model:driver="book.driver" />
-    <div class="grid grid-cols-2 gap-3">
-      <Field label="Move"><select v-model="book.move_type" class="tos-input"><option v-for="m in ALL_MOVES" :key="m" :value="m">{{ m }}</option></select></Field>
-      <Field label="Container"><ContainerPick v-model="book.container" /></Field>
-      <Field label="Booking reference"><input v-model="book.booking_ref" class="tos-input" /></Field>
-      <Field label="Approved override" hint="Only for a full slot or a closed window."><select v-model="book.override" class="tos-input"><option value="">None</option><option v-for="o in overrides" :key="o.name" :value="o.name">{{ o.name }} · {{ o.override_type }}</option></select></Field>
-    </div>
+    <JobsEditor v-model="jobs" :types="types" :chassis="chassis" :lengths="lk.container_lengths?.length ? lk.container_lengths : [20, 40]" staff />
+    <Field label="Approved override" hint="Only for a full slot or a closed window."><select v-model="book.override" class="tos-input"><option value="">None</option><option v-for="o in overrides" :key="o.name" :value="o.name">{{ o.name }} · {{ o.override_type }}</option></select></Field>
   </Modal>
 
   <Modal :open="cancel.open" title="Cancel appointment" confirm-label="Cancel appointment" :loading="cancel.loading" :error="cancel.error" @close="cancel.open = false" @confirm="submitCancel">

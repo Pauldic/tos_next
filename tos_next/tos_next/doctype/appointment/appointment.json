@@ -10,6 +10,7 @@
   "start_time",
   "end_time",
   "cb1",
+  "visit_type",
   "move_type",
   "direction",
   "status",
@@ -19,6 +20,7 @@
   "cb2",
   "driver",
   "sb_what",
+  "lines",
   "container",
   "booking_ref",
   "cb3",
@@ -74,19 +76,30 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "move_type",
+   "fieldname": "visit_type",
    "fieldtype": "Select",
-   "label": "Move",
-   "options": "Export Drop\nEmpty Return\nImport Pickup\nEmpty Pickup",
-   "reqd": 1,
+   "label": "Visit",
+   "options": "Receive\nDeliver\nReceive and Deliver",
+   "read_only": 1,
    "in_list_view": 1,
    "in_standard_filter": 1
+  },
+  {
+   "fieldname": "move_type",
+   "fieldtype": "Link",
+   "label": "Transaction",
+   "options": "Transaction Type",
+   "reqd": 0,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "Summary of the jobs below; set automatically"
   },
   {
    "fieldname": "direction",
    "fieldtype": "Select",
    "label": "Direction",
-   "options": "In\nOut",
+   "options": "In\nOut\nBoth",
    "read_only": 1,
    "in_standard_filter": 1
   },
@@ -135,22 +148,27 @@
   {
    "fieldname": "sb_what",
    "fieldtype": "Section Break",
-   "label": "What"
+   "label": "Jobs"
+  },
+  {
+   "fieldname": "lines",
+   "fieldtype": "Table",
+   "label": "Jobs on this Visit",
+   "options": "Appointment Line",
+   "description": "One line per container the truck drops off or picks up. A truck can do any mix, as long as the containers fit its chassis."
   },
   {
    "fieldname": "container",
    "fieldtype": "Link",
-   "label": "Container",
+   "label": "First Container",
    "options": "Container",
-   "depends_on": "eval:doc.move_type!='Export Drop' && doc.move_type!='Empty Return'",
-   "mandatory_depends_on": "eval:doc.move_type=='Import Pickup'"
+   "read_only": 1
   },
   {
    "fieldname": "booking_ref",
    "fieldtype": "Data",
-   "label": "Booking Reference",
-   "depends_on": "eval:doc.move_type=='Export Drop'",
-   "mandatory_depends_on": "eval:doc.move_type=='Export Drop'"
+   "label": "First Booking Ref",
+   "read_only": 1
   },
   {
    "fieldname": "cb3",
@@ -201,7 +219,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-26 07:00:00.000000",
+ "modified": "2026-11-15 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "Appointment",
@@ -260,8 +278,8 @@
   {
    "role": "Carrier Portal User",
    "read": 1,
-   "write": 0,
-   "create": 0
+   "write": 1,
+   "create": 1
   }
  ],
  "sort_field": "modified",

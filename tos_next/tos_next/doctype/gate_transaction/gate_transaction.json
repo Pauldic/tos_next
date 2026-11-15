@@ -146,9 +146,9 @@
   },
   {
    "fieldname": "move_type",
-   "fieldtype": "Select",
-   "label": "Move",
-   "options": "Export Drop\nEmpty Return\nImport Pickup\nEmpty Pickup",
+   "fieldtype": "Link",
+   "label": "Transaction",
+   "options": "Transaction Type",
    "reqd": 1,
    "in_list_view": 1
   },
@@ -302,7 +302,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-26 07:00:00.000000",
+ "modified": "2026-11-15 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "Gate Transaction",

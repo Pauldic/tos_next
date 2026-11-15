@@ -68,10 +68,14 @@ def _setup_equipment():
                             "status": "Available", "max_lift_tier": tier, "handles_forty": forty, "capacity_tonnes": 45}).insert(ignore_permissions=True)
 
 
+def _chassis(name="45 ft"):
+    return name if frappe.db.exists("Chassis Type", name) else frappe.db.get_value("Chassis Type", {"is_active": 1}, "name", order_by="max_container_length_ft desc")
+
+
 def _setup_blocks():
     """A blocked truck and an expired driver under carrier 1, to test the refusals."""
     if not frappe.db.exists("Truck", "DEMO BLK 01"):
-        frappe.get_doc({"doctype": "Truck", "plate_no": "DEMO BLK 01", "carrier": CARRIER_1, "max_container_length": "Up to 45 ft",
+        frappe.get_doc({"doctype": "Truck", "plate_no": "DEMO BLK 01", "carrier": CARRIER_1, "chassis_type": _chassis(),
                         "is_blocked": 1, "block_reason": "Unpaid gate fees (test)"}).insert(ignore_permissions=True)
     if not frappe.db.exists("Driver", {"licence_no": "DEMO-LIC-EXPIRED"}):
         frappe.get_doc({"doctype": "Driver", "full_name": "Expired Licence Driver", "carrier": CARRIER_1, "licence_no": "DEMO-LIC-EXPIRED",
@@ -156,21 +160,21 @@ def refresh_today():
     made = {}
 
     # 1. clean Gate In, carrier 1, in the current window
-    made["gate_in"] = frappe.get_doc({"doctype": "Appointment", "slot": slot, "move_type": "Export Drop", "carrier": CARRIER_1, "truck": t1[0], "driver": d1[0],
-                                      "booking_ref": f"TESTKIT-{n}-IN"}).insert(ignore_permissions=True).name
+    made["gate_in"] = frappe.get_doc({"doctype": "Appointment", "slot": slot, "carrier": CARRIER_1, "truck": t1[0], "driver": d1[0],
+                                      "lines": [{"move_type": "Receive Export", "container_length": 40, "booking_ref": f"TESTKIT-{n}-IN"}]}).insert(ignore_permissions=True).name
 
     # 2. clean Gate Out, carrier 2: pick up an import container that sits on top of its stack
     pick = _tops({"category": "Import"}, limit=1)
     if pick:
-        made["gate_out"] = frappe.get_doc({"doctype": "Appointment", "slot": slot, "move_type": "Import Pickup", "carrier": CARRIER_2, "truck": t2[0], "driver": d2[0],
-                                           "container": pick[0].name, "booking_ref": f"TESTKIT-{n}-OUT"}).insert(ignore_permissions=True).name
+        made["gate_out"] = frappe.get_doc({"doctype": "Appointment", "slot": slot, "carrier": CARRIER_2, "truck": t2[0], "driver": d2[0],
+                                           "lines": [{"move_type": "Deliver Import", "container": pick[0].name, "booking_ref": f"TESTKIT-{n}-OUT"}]}).insert(ignore_permissions=True).name
 
     # 3. a slot far from now (next weekday 10:00): the truck is 'too early', so it needs an override
     later = frappe.get_all("Slot Capacity", filters={"terminal": TERMINAL, "slot_date": [">", nowdate()], "start_time": "10:00:00", "is_closed": 0},
                            pluck="name", order_by="slot_date asc", limit=1)
     if later:
-        early = frappe.get_doc({"doctype": "Appointment", "slot": later[0], "move_type": "Export Drop", "carrier": CARRIER_1, "truck": t1[1], "driver": d1[1],
-                                "booking_ref": f"TESTKIT-{n}-EARLY"}).insert(ignore_permissions=True)
+        early = frappe.get_doc({"doctype": "Appointment", "slot": later[0], "carrier": CARRIER_1, "truck": t1[1], "driver": d1[1],
+                                "lines": [{"move_type": "Receive Export", "container_length": 40, "booking_ref": f"TESTKIT-{n}-EARLY"}]}).insert(ignore_permissions=True)
         made["too_early"] = early.name
         # the clerk asks for an override; the supervisor approves it during the test
         frappe.set_user("clerk@tos.test")

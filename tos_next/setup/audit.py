@@ -133,7 +133,7 @@ def boundary_test(r):
         r.add(denied(lambda: p.portal_save_driver(carrier=made["a"]["carrier"], full_name="X", licence_no=f"HX{tag}", licence_expiry=add_days(nowdate(), 100))),
               "Carrier B cannot add a driver to carrier A")
         r.add(denied(lambda: p.portal_save_truck(carrier=made["b"]["carrier"], name=made["a"]["truck"])), "Carrier B cannot edit carrier A's truck")
-        r.add(denied(lambda: p.portal_book(slot="none", carrier=made["a"]["carrier"], truck=made["a"]["truck"], driver=made["a"]["driver"], move_type="Export Drop")),
+        r.add(denied(lambda: p.portal_book(slot="none", carrier=made["a"]["carrier"], truck=made["a"]["truck"], driver=made["a"]["driver"], move_type="Receive Export")),
               "Carrier B cannot book for carrier A")
         fleet = p.portal_fleet()
         r.add(len(fleet["trucks"]) == 1 and all(x["carrier"] == made["b"]["carrier"] for x in fleet["trucks"] + fleet["drivers"]), "Carrier B's fleet list shows only carrier B")

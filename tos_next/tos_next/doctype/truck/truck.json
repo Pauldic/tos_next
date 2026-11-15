@@ -8,7 +8,7 @@
   "carrier",
   "truck_type",
   "cb1",
-  "max_container_length",
+  "chassis_type",
   "rfid_tag",
   "is_blocked",
   "block_reason"
@@ -43,12 +43,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "max_container_length",
-   "fieldtype": "Select",
-   "label": "Can Carry",
-   "options": "20 ft only\nUp to 40 ft\nUp to 45 ft",
-   "default": "Up to 40 ft",
-   "description": "Checked against the container's length at the gate"
+   "fieldname": "chassis_type",
+   "fieldtype": "Link",
+   "label": "Chassis",
+   "options": "Chassis Type",
+   "reqd": 1,
+   "in_list_view": 1,
+   "description": "What the truck can carry. Checked against every container it drops off or picks up."
   },
   {
    "fieldname": "rfid_tag",
@@ -72,7 +73,7 @@
   }
  ],
  "links": [],
- "modified": "2026-10-26 07:00:00.000000",
+ "modified": "2026-11-14 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "TOS Next",
  "name": "Truck",
@@ -134,8 +135,8 @@
   {
    "role": "Carrier Portal User",
    "read": 1,
-   "write": 0,
-   "create": 0
+   "write": 1,
+   "create": 1
   }
  ],
  "sort_field": "modified",

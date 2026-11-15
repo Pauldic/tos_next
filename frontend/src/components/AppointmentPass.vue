@@ -29,8 +29,8 @@ const window_ = computed(() => `${shift(hm(props.appt.start_time), -(props.ctx.e
 const driverName = computed(() => props.ctx.drivers?.find((d: any) => d.name === props.appt.driver)?.full_name || props.appt.driver)
 const rows = computed(() => [
   ['Appointment', props.appt.name], ['Date', date.value], ['Slot', `${hm(props.appt.start_time)}–${hm(props.appt.end_time)}`],
-  ['Arrive between', window_.value], ['Job', props.appt.move_type], ['Truck', props.appt.truck], ['Driver', driverName.value],
-  ...(props.appt.container ? [['Container', props.appt.container]] : []), ...(props.appt.booking_ref ? [['Booking', props.appt.booking_ref]] : []),
+  ['Arrive between', window_.value], ['Visit', props.appt.visit_type || props.appt.move_type], ['Truck', props.appt.truck], ['Driver', driverName.value],
+  ...(props.appt.lines || []).map((l: any, i: number) => [`Job ${i + 1}`, `${l.move_type} · ${l.container_length} ft${l.container ? ' · ' + l.container : ''}${l.booking_ref ? ' · ' + l.booking_ref : ''}${l.status && l.status !== 'Pending' ? ' (' + l.status + ')' : ''}`]),
 ])
 
 function save() {

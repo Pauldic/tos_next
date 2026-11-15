@@ -1,0 +1,77 @@
+{
+ "actions": [],
+ "creation": "2026-11-14 16:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-15 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "name": "Appointment Line",
+ "istable": 1,
+ "editable_grid": 1,
+ "fields": [
+  {
+   "fieldname": "move_type",
+   "fieldtype": "Link",
+   "label": "Transaction",
+   "options": "Transaction Type",
+   "reqd": 1,
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "container",
+   "fieldtype": "Link",
+   "label": "Container",
+   "options": "Container",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "container_length",
+   "fieldtype": "Int",
+   "label": "Size (ft)",
+   "in_list_view": 1,
+   "columns": 1,
+   "description": "Taken from the container when one is chosen"
+  },
+  {
+   "fieldname": "booking_ref",
+   "fieldtype": "Data",
+   "label": "Booking Ref",
+   "in_list_view": 1,
+   "columns": 2
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "Pending\nDone\nCancelled",
+   "default": "Pending",
+   "read_only": 1,
+   "in_list_view": 1,
+   "columns": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "gate_transaction",
+   "fieldtype": "Link",
+   "label": "Gate Transaction",
+   "options": "Gate Transaction",
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "done_on",
+   "fieldtype": "Datetime",
+   "label": "Done On",
+   "read_only": 1,
+   "no_copy": 1
+  }
+ ]
+}

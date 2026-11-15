@@ -8,6 +8,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, now_datetime
 
+from tos_next import transactions
 from tos_next.api import _terminal
 from tos_next.tos_next.doctype.appointment.appointment import slot_window
 from tos_next.settings import gate_window
@@ -49,17 +50,19 @@ def gate_action(transaction, action, **args):
 
 
 @frappe.whitelist()
-def start_visit(lane, carrier, truck, driver, move_type, appointment=None, override=None,
+def start_visit(lane, carrier, truck, driver, move_type=None, appointment=None, override=None, appointment_line=None,
                 container=None, container_no=None, container_type=None, shipping_line=None, booking_ref=None, seal_no=None, gross_weight_kg=None):
     # A container typed at the gate that is not in the system yet is a NEW container: it needs a number and a type.
     if container and not frappe.db.exists("Container", container):
         container_no, container = container, None
     doc = frappe.get_doc({
         "doctype": "Gate Transaction", "lane": lane, "carrier": carrier, "truck": truck, "driver": driver,
-        "move_type": move_type, "appointment": appointment or None, "override": override or None,
+        "move_type": move_type or _default_transaction(lane), "appointment": appointment or None, "override": override or None,
         "container": container or None, "container_no": container_no or None, "container_type": container_type or None, "shipping_line": shipping_line or None, "booking_ref": booking_ref or None,
         "seal_no": seal_no or None, "gross_weight_kg": gross_weight_kg or None,
-    }).insert()
+    })
+    doc.flags.appointment_line = appointment_line or None
+    doc.insert()
     return _tx(doc)
 
 
@@ -103,9 +106,12 @@ def container_types():
 
 @frappe.whitelist()
 def lookups(carrier=None):
-    out = {"carriers": frappe.get_list("Carrier", filters={"is_blocked": 0}, fields=["name", "carrier_name"], order_by="name", limit_page_length=0)}
+    out = {"carriers": frappe.get_list("Carrier", filters={"is_blocked": 0}, fields=["name", "carrier_name"], order_by="name", limit_page_length=0),
+           "transaction_types": transactions.offered(None),
+           "chassis_types": frappe.get_all("Chassis Type", filters={"is_active": 1}, fields=["name", "max_container_length_ft", "max_containers", "max_total_length_ft"]),
+           "container_lengths": sorted({int(x) for x in frappe.get_all("Container Type", filters={"is_active": 1}, pluck="length_ft") if x})}
     if carrier:
-        out["trucks"] = frappe.get_list("Truck", filters={"carrier": carrier, "is_blocked": 0}, fields=["name"], order_by="name", limit_page_length=0)
+        out["trucks"] = frappe.get_list("Truck", filters={"carrier": carrier, "is_blocked": 0}, fields=["name", "chassis_type"], order_by="name", limit_page_length=0)
         out["drivers"] = frappe.get_list("Driver", filters={"carrier": carrier, "is_blocked": 0}, fields=["name", "driver_name"], order_by="name", limit_page_length=0)
     else:
         out["trucks"], out["drivers"] = [], []
@@ -123,16 +129,54 @@ def approved_overrides(terminal=None):
 @frappe.whitelist()
 def appointments_for_day(date, terminal=None):
     terminal = _terminal(terminal)
-    return frappe.get_list("Appointment", filters={"terminal": terminal, "slot_date": date}, order_by="start_time asc, creation asc", limit_page_length=0,
-                           fields=["name", "slot", "start_time", "end_time", "status", "move_type", "direction", "carrier", "truck", "driver", "container", "booking_ref", "override"])
+    rows = frappe.get_list("Appointment", filters={"terminal": terminal, "slot_date": date}, order_by="start_time asc, creation asc", limit_page_length=0,
+                           fields=["name", "slot", "start_time", "end_time", "status", "move_type", "direction", "visit_type", "carrier", "truck", "driver", "container", "booking_ref", "override"])
+    return attach_lines(rows)
+
+
+LINE_FIELDS = ["name", "parent", "idx", "move_type", "container", "container_length", "booking_ref", "status", "gate_transaction"]
+
+
+def attach_lines(rows):
+    """Adds the list of jobs ('lines') to each appointment row, with one query for all of them."""
+    names = [r["name"] for r in rows]
+    by = {}
+    if names:
+        for l in frappe.get_all("Appointment Line", filters={"parent": ["in", names], "parenttype": "Appointment"}, fields=LINE_FIELDS, order_by="idx asc", limit_page_length=0):
+            by.setdefault(l.parent, []).append(l)
+    for r in rows:
+        r["lines"] = by.get(r["name"], [])
+        for l in r["lines"]:
+            l["direction"] = transactions.direction(l["move_type"])
+    return rows
 
 
 @frappe.whitelist()
-def book_appointment(slot, carrier, truck, driver, move_type, container=None, booking_ref=None, override=None):
+def book_appointment(slot, carrier, truck, driver, lines=None, move_type=None, container=None, booking_ref=None, override=None):
+    """lines: a list of jobs, each {move_type, container?, container_length?, booking_ref?}. The older single-job
+    arguments (move_type, container, booking_ref) still work and make one job."""
+    jobs = clean_lines(lines)
     doc = frappe.get_doc({"doctype": "Appointment", "slot": slot, "carrier": carrier, "truck": truck, "driver": driver,
-                          "move_type": move_type, "container": container or None, "booking_ref": booking_ref or None,
+                          "move_type": None if jobs else move_type, "container": None if jobs else (container or None),
+                          "booking_ref": None if jobs else (booking_ref or None), "lines": jobs,
                           "override": override or None, "terminal": frappe.db.get_value("Slot Capacity", slot, "terminal")}).insert()
     return {"name": doc.name, "status": doc.status}
+
+
+JOB_FIELDS = ("move_type", "container", "container_length", "booking_ref")
+
+
+def clean_lines(lines):
+    """Accepts the jobs as sent by a screen (a list, or JSON text) and keeps only the fields a job may carry."""
+    if isinstance(lines, str):
+        lines = frappe.parse_json(lines) if lines.strip() else []
+    out = []
+    for l in lines or []:
+        row = {k: (l.get(k) if l.get(k) not in ("", None) else None) for k in JOB_FIELDS}
+        if row["container"]:
+            row["container"] = str(row["container"]).strip().upper().replace(" ", "").replace("-", "")
+        out.append(row)
+    return out
 
 
 @frappe.whitelist()
@@ -199,8 +243,12 @@ def scan_pass(code, terminal=None):
         frappe.throw(_("This pass is not valid."))
     if a.terminal != terminal:
         frappe.throw(_("This pass is for terminal {0}.").format(a.terminal))
-    if a.status in ("Arrived", "In Progress"):
-        frappe.throw(_("{0} has already been used (arrived {1}).").format(a.name, a.arrived_at))
+    lines = frappe.get_all("Appointment Line", filters={"parent": a.name, "parenttype": "Appointment"}, fields=LINE_FIELDS, order_by="idx asc")
+    pending = [l for l in lines if l.status == "Pending"]
+    if a.status == "Arrived":
+        frappe.throw(_("{0} already has a visit under way (arrived {1}). Finish or reject it first.").format(a.name, a.arrived_at))
+    if a.status == "In Progress" and not pending:
+        frappe.throw(_("{0} has no job left.").format(a.name))
     if a.status in ("Completed", "Cancelled"):
         frappe.throw(_("{0} is {1}.").format(a.name, a.status))
     if a.status == "No-show":
@@ -223,16 +271,30 @@ def scan_pass(code, terminal=None):
         frappe.get_doc("Driver", a.driver).assert_can_work()
     except frappe.ValidationError as e:
         blockers.append(frappe.utils.strip_html(str(e)))
-    if a.direction == "Out" and a.container and frappe.db.get_value("Container", a.container, "is_on_hold"):
-        blockers.append(_("{0} is on hold.").format(a.container))
+    for l in pending:
+        if not transactions.is_in(l.move_type) and l.container and frappe.db.get_value("Container", l.container, "is_on_hold"):
+            blockers.append(_("{0} is on hold.").format(l.container))
     frappe.local.message_log = []  # the checks above are advice here; do not show them as popups
 
     return {
         "appointment": a.name, "status": a.status, "direction": a.direction, "move_type": a.move_type,
         "carrier": a.carrier, "carrier_name": carrier.carrier_name, "truck": a.truck, "driver": a.driver,
         "driver_name": frappe.db.get_value("Driver", a.driver, "full_name"), "container": a.container, "booking_ref": a.booking_ref,
+        "visit_type": frappe.db.get_value("Appointment", a.name, "visit_type"), "lines": [dict(l, direction=transactions.direction(l.move_type)) for l in lines], "pending": [l.name for l in pending],
         "slot_start": start.strftime("%H:%M"), "slot_end": end.strftime("%H:%M"),
         "window": {"state": state, "minutes": minutes, "opens": opens.strftime("%H:%M"), "closes": closes.strftime("%H:%M")},
         "needs_override": "Outside Slot Window" if state != "ok" else None,
         "blockers": blockers,
     }
+
+
+def _default_transaction(lane):
+    """When a visit names no transaction (an appointment will fill it in), use the first active one that fits the lane."""
+    direction = frappe.db.get_value("Gate Lane", lane, "direction")
+    return frappe.db.get_value("Transaction Type", {"is_active": 1, "direction": direction}, "name", order_by="sort_order asc")
+
+
+@frappe.whitelist()
+def transaction_types(terminal=None):
+    """The transactions this terminal offers (Receive Import, Deliver Empty ...), with the rules each carries."""
+    return transactions.offered(_terminal(terminal))

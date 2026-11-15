@@ -22,18 +22,19 @@ const trucks = computed(() => (fleet.value?.trucks || []).filter((t: any) => t.c
 const drivers = computed(() => (fleet.value?.drivers || []).filter((d: any) => d.carrier === carrier.value))
 
 const TYPES = ['Tractor and Trailer', 'Rigid', 'Terminal Tractor']
-const LENGTHS = ['20 ft only', 'Up to 40 ft', 'Up to 45 ft']
-const t = reactive({ open: false, name: '', plate_no: '', truck_type: TYPES[0], max_container_length: LENGTHS[1], rfid_tag: '', error: '', loading: false })
+const chassisTypes = computed(() => fleet.value?.chassis_types || [])
+const chassisText = (c: any) => `${c.name} · ${c.max_containers > 1 ? 'up to ' + c.max_containers + ' containers, ' : ''}${c.max_total_length_ft} ft`
+const t = reactive({ open: false, name: '', plate_no: '', truck_type: TYPES[0], chassis_type: '', rfid_tag: '', error: '', loading: false })
 const d = reactive({ open: false, name: '', full_name: '', phone: '', licence_no: '', licence_expiry: '', error: '', loading: false })
 
-const addTruck = () => Object.assign(t, { open: true, name: '', plate_no: '', truck_type: TYPES[0], max_container_length: LENGTHS[1], rfid_tag: '', error: '' })
-const editTruck = (x: any) => Object.assign(t, { open: true, name: x.name, plate_no: x.plate_no, truck_type: x.truck_type, max_container_length: x.max_container_length, rfid_tag: x.rfid_tag || '', error: '' })
+const addTruck = () => Object.assign(t, { open: true, name: '', plate_no: '', truck_type: TYPES[0], chassis_type: '', rfid_tag: '', error: '' })
+const editTruck = (x: any) => Object.assign(t, { open: true, name: x.name, plate_no: x.plate_no, truck_type: x.truck_type, chassis_type: x.chassis_type || '', rfid_tag: x.rfid_tag || '', error: '' })
 const addDriver = () => Object.assign(d, { open: true, name: '', full_name: '', phone: '', licence_no: '', licence_expiry: '', error: '' })
 const editDriver = (x: any) => Object.assign(d, { open: true, name: x.name, full_name: x.full_name, phone: x.phone || '', licence_no: x.licence_no, licence_expiry: x.licence_expiry, error: '' })
 
 async function saveTruck() {
   t.loading = true; t.error = ''
-  try { await portalAct('portal_save_truck', { carrier: carrier.value, name: t.name, plate_no: t.plate_no, truck_type: t.truck_type, max_container_length: t.max_container_length, rfid_tag: t.rfid_tag }); t.open = false; await load() }
+  try { await portalAct('portal_save_truck', { carrier: carrier.value, name: t.name, plate_no: t.plate_no, truck_type: t.truck_type, chassis_type: t.chassis_type, rfid_tag: t.rfid_tag }); t.open = false; await load() }
   catch (e: any) { t.error = e.message } finally { t.loading = false }
 }
 async function saveDriver() {
@@ -66,7 +67,7 @@ const prettyDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString([
         <div class="mb-2 flex items-center justify-between"><h2 class="text-base-medium text-ink-gray-9">Trucks <span class="text-ink-gray-5">· {{ trucks.length }}</span></h2><Button variant="solid" icon-left="lucide-plus" label="Add truck" @click="addTruck" /></div>
         <ul class="divide-y divide-outline-gray-1 rounded-6 border border-outline-gray-1 bg-surface-white shadow-sm">
           <li v-for="x in trucks" :key="x.name" class="flex items-center gap-3 px-4 py-3">
-            <div class="min-w-0 flex-1"><p class="text-base-medium text-ink-gray-9">{{ x.plate_no }}</p><p class="truncate text-sm text-ink-gray-5">{{ x.truck_type }} · {{ x.max_container_length }}<template v-if="x.rfid_tag"> · RFID {{ x.rfid_tag }}</template></p>
+            <div class="min-w-0 flex-1"><p class="text-base-medium text-ink-gray-9">{{ x.plate_no }}</p><p class="truncate text-sm text-ink-gray-5">{{ x.truck_type }} · {{ x.chassis_type }}<template v-if="x.rfid_tag"> · RFID {{ x.rfid_tag }}</template></p>
               <p v-if="x.is_blocked" class="mt-1 text-sm text-ink-red-3">Blocked by the terminal: {{ x.block_reason }}</p></div>
             <Badge v-if="x.is_blocked" theme="red" label="Blocked" />
             <Button v-else variant="ghost" label="Edit" @click="editTruck(x)" />
@@ -98,7 +99,7 @@ const prettyDate = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString([
     <Field label="Plate number" :hint="t.name ? 'The plate cannot be changed. Add a new truck instead.' : undefined"><input v-model="t.plate_no" class="tos-input uppercase" :disabled="!!t.name" autocomplete="off" /></Field>
     <div class="grid grid-cols-2 gap-3">
       <Field label="Type"><select v-model="t.truck_type" class="tos-input"><option v-for="x in TYPES" :key="x">{{ x }}</option></select></Field>
-      <Field label="Largest container"><select v-model="t.max_container_length" class="tos-input"><option v-for="x in LENGTHS" :key="x">{{ x }}</option></select></Field>
+      <Field label="Chassis" hint="What the truck can carry. A container that does not fit is refused when you book."><select v-model="t.chassis_type" class="tos-input"><option value="">Choose…</option><option v-for="x in chassisTypes" :key="x.name" :value="x.name">{{ chassisText(x) }}</option></select></Field>
     </div>
     <Field label="RFID tag (optional)"><input v-model="t.rfid_tag" class="tos-input" /></Field>
   </Modal>

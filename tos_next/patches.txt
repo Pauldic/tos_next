@@ -4,3 +4,5 @@
 tos_next.patches.create_default_layouts
 tos_next.patches.convert_container_fields
 tos_next.patches.convert_full_empty_to_fcl_mt
+tos_next.patches.add_appointment_lines
+tos_next.patches.add_transaction_types

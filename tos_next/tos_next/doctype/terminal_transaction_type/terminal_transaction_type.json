@@ -1,0 +1,34 @@
+{
+ "actions": [],
+ "creation": "2026-11-15 09:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "links": [],
+ "modified": "2026-11-15 09:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "TOS Next",
+ "owner": "Administrator",
+ "states": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "name": "Terminal Transaction Type",
+ "istable": 1,
+ "editable_grid": 1,
+ "fields": [
+  {
+   "fieldname": "transaction_type",
+   "fieldtype": "Link",
+   "label": "Transaction",
+   "options": "Transaction Type",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "label": "Offered",
+   "default": "1",
+   "in_list_view": 1
+  }
+ ]
+}
